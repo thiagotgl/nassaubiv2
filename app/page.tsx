@@ -15,17 +15,17 @@ export default function Dashboard() {
     const carregarTudo = async () => {
       setLoading(true);
 
-      // FATURAMENTO DO DIA REAL (HOJE)
+      // FATURAMENTO DO DIA HOJE
       const hojeStr = new Date().toISOString().slice(0, 10);
       const hojeRes = await fetch(`/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`);
       const hojeData = await hojeRes.json();
 
-      // FATURAMENTO MENSAL (últimos 12 meses)
+      // FATURAMENTO DOS ÚLTIMOS 12 MESES
       const hoje = new Date();
       const meses = [];
       for (let i = 11; i >= 0; i--) {
         const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-        const inicio = data.toISOString().slice(0, 10); // ← LINHA LIMPA
+        const inicio = data.toISOString().slice(0, 10);  // ← LINHA 100% LIMPA
         const fimMes = new Date(data.getFullYear(), data.getMonth() + 1, 0);
         const fim = fimMes.toISOString().slice(0, 10);
         const nome = data.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
@@ -37,10 +37,10 @@ export default function Dashboard() {
           const res = await fetch(`/api/faturamento?inicio=${inicio}&fim=${fim}`);
           const data = await res.json();
           const valor = data.valor_bruto || 0;
-          return { 
-            mes: nome, 
-            valor, 
-            valorFormatado: valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) 
+          return {
+            mes: nome,
+            valor,
+            valorFormatado: valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
           };
         })
       );
@@ -56,7 +56,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <p className="text-6xl font-bold text-white animate-pulse">Carregando...</p>
+        <p className="text-6xl font-bold text-white animate-pulse">Carregando PowerNassau BI...</p>
       </div>
     );
   }
@@ -64,11 +64,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
       <div className="max-w-7xl mx-auto p-8 space-y-32">
-        <h1 className="text-7xl md:text-9xl font-black text-center bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-yellow-400 to-pink-500">
+
+        <h1 className="text-7xl md:text-9xl font-black text-center bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-yellow-400 to-pink-500 drop-shadow-2xl">
           FATURAMENTO TOTAL CLÍNICA
         </h1>
 
-        {/* FATURAMENTO HOJE */}
+        {/* CARD DO DIA */}
         <section className="text-center">
           <div className="inline-block bg-white/10 backdrop-blur-3xl rounded-3xl p-20 shadow-2xl border border-white/30">
             <p className="text-5xl font-bold mb-8">Faturamento Hoje</p>
@@ -92,15 +93,7 @@ export default function Dashboard() {
                 <Bar dataKey="valor" fill="#10b981" radius={20} barSize={32} />
                 <Line type="monotone" dataKey="valor" stroke="#fbbf24" strokeWidth={6} dot={{ fill: '#fbbf24', r: 12 }} />
                 {mensal.map((entry, index) => (
-                  <text 
-                    key={index}
-                    x={index * (1000 / mensal.length) + 500 / mensal.length}
-                    y={entry.valor > 10000 ? entry.valor - 15000 : entry.valor + 40000}
-                    textAnchor="middle"
-                    fill="#ffffff"
-                    fontSize="20"
-                    fontWeight="bold"
-                  >
+                  <text key={index} x={index * (1000 / mensal.length) + 500 / mensal.length} y={entry.valor - 15000} textAnchor="middle" fill="#ffffff" fontSize="20" fontWeight="bold">
                     {entry.valorFormatado}
                   </text>
                 ))}
@@ -108,6 +101,10 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </section>
+
+        <footer className="text-center pb-20 text-xl opacity-70">
+          Dados 100% reais do Biodata — atualizado automaticamente
+        </footer>
       </div>
     </div>
   );
