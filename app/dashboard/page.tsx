@@ -1,3 +1,4 @@
+
 // app/dashboard/page.tsx
 'use client';
 
@@ -15,9 +16,35 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Label customizado para as barras
+function CustomBarLabel(props: any) {
+  const { x, y, width, value } = props;
+
+  if (!value) return null;
+
+  const cx = x + width / 2;
+  const label = Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+
+  return (
+    <text
+      x={cx}
+      y={y - 16}
+      textAnchor="middle"
+      fill="#0f172a"
+      fontSize={16}
+      fontWeight={700}
+    >
+      {label}
+    </text>
+  );
+}
+
 export default function Dashboard() {
-  const [hoje, setHoje] = useState(null);
-  const [mensal, setMensal] = useState([]);
+  const [hoje, setHoje] = useState<any>(null);
+  const [mensal, setMensal] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,7 +56,7 @@ export default function Dashboard() {
       const hojeData = await hojeRes.json();
 
       const hoje = new Date();
-      const meses = [];
+      const meses: any[] = [];
       for (let i = 11; i >= 0; i--) {
         const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
         const inicio = data.toISOString().slice(0, 10);
@@ -47,10 +74,6 @@ export default function Dashboard() {
           return {
             mes: nome,
             valor,
-            valorFormatado: valor.toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL',
-            }),
           };
         })
       );
@@ -85,9 +108,7 @@ export default function Dashboard() {
             <p className="text-5xl font-bold mb-8">Faturamento Hoje</p>
             <p className="text-9xl font-black text-green-400">{hoje.faturamento}</p>
             <p className="text-3xl mt-10 opacity-80">
-              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", {
-                locale: ptBR,
-              })}
+              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </p>
           </div>
         </section>
@@ -98,28 +119,18 @@ export default function Dashboard() {
           </h2>
           <div className="bg-white/5 backdrop-blur-3xl rounded-3xl p-12 shadow-2xl">
             <ResponsiveContainer width="100%" height={600}>
-              <ComposedChart
-                data={mensal}
-                margin={{ top: 60, right: 30, left: 50, bottom: 80 }}
-              >
+              <ComposedChart data={mensal} margin={{ top: 60, right: 30, left: 50, bottom: 80 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
                 <XAxis dataKey="mes" stroke="#e2e8f0" fontSize={18} />
                 <YAxis
                   stroke="#e2e8f0"
                   fontSize={16}
                   tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
+                  domain={[0, 'dataMax * 1.2']}
                 />
 
                 <Bar dataKey="valor" fill="#10b981" radius={20} barSize={32}>
-                  <LabelList
-                    dataKey="valorFormatado"
-                    position="top"
-                    style={{
-                      fill: '#0f172a',
-                      fontSize: 18,
-                      fontWeight: 700,
-                    }}
-                  />
+                  <LabelList content={<CustomBarLabel />} />
                 </Bar>
 
                 <Line
@@ -141,3 +152,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
