@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -20,44 +18,42 @@ export default function Dashboard() {
       .catch(() => setLoading(false));
   }, [inicio, fim]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-4xl text-white">Carregando dados reais...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen text-5xl text-white font-bold">Carregando dados reais...</div>;
 
   return (
-    <div className="min-h-screen text-white p-8">
-      <h1 className="text-5xl font-bold text-center mb-12">PowerNassau BI — Dados 100% Reais</h1>
+    <div className="min-h-screen text-white p-12">
+      <h1 className="text-6xl font-bold text-center mb-16">PowerNassau BI — Dados 100% Reais</h1>
 
-      <div className="max-w-5xl mx-auto space-y-12">
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="bg-white/10 backdrop-blur rounded-3xl p-10 text-center">
-            <p className="text-2xl opacity-90">Total de Atendimentos</p>
-            <p className="text-8xl font-bold mt-6">{data?.totalAtendimentos || 0}</p>
-            <p className="mt-4 text-lg opacity-80">
-              {inicio === fim ? format(new Date(inicio), 'dd/MM/yyyy', { locale: ptBR }) : `${inicio} → ${fim}`}
-            </p>
+      <div className="max-w-7xl mx-auto space-y-12">
+        <div className="grid md:grid-cols-3 gap-10">
+          <div className="bg-white/20 backdrop-blur-xl rounded-3xl p-12 text-center shadow-2xl">
+            <p className="text-3xl opacity-90 mb-6">Total de Atendimentos</p>
+            <p className="text-9xl font-black">{data?.totalAtendimentos || 0}</p>
+            <p className="mt-6 text-2xl opacity-80">{inicio === fim ? inicio.split('-').reverse().join('/') : `${inicio.split('-').reverse().join('/')} → ${fim.split('-').reverse().join('/')}`}</p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur rounded-3xl p-10 text-center">
-            <p className="text-2xl opacity-90">Tempo Médio</p>
-            <p className="text-8xl font-bold mt-6">{data?.tempoMedioMinutos || '0'} min</p>
+          <div className="bg-white/20 backdrop-blur-xl rounded-3xl p-12 text-center shadow-2xl">
+            <p className="text-3xl opacity-90 mb-6">Tempo Médio</p>
+            <p className="text-9xl font-black">{data?.tempoMedioMinutos || '0'} min</p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur rounded-3xl p-10">
-            <p className="text-2xl mb-6 text-center opacity-90">Top 10 Profissionais</p>
+          <div className="bg-white/20 backdrop-blur-xl rounded-3xl p-12 shadow-2xl">
+            <p className="text-3xl mb-8 text-center opacity-90">Top 10 Profissionais</p>
             {data?.topProfissionais?.map((p: any, i: number) => (
-              <div key={p.id} className="flex justify-between py-3 border-b border-white/20">
-                <span className="text-lg">{i + 1}º ID {p.id}</span>
-                <span className="text-2xl font-bold">{p.qtd}</span>
+              <div key={p.id} className="flex justify-between py-4 border-b border-white/30 last:border-0">
+                <span className="text-2xl">{i + 1}º ID {p.id}</span>
+                <span className="text-4xl font-bold">{p.qtd}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="text-center space-x-6">
-          <input type="date" value={inicio} onChange={e => setInicio(e.target.value)} className="p-4 rounded-lg text-black text-lg" />
-          <input type="date" value={fim} onChange={e => setFim(e.target.value)} className="p-4 rounded-lg text-black text-lg" />
+        <div className="text-center space-x-8">
+          <input type="date" value={inicio} onChange={e => setInicio(e.target.value)} className="p-4 text-xl rounded-xl text-black" />
+          <input type="date" value={fim} onChange={e => setFim(e.target.value)} className="p-4 text-xl rounded-xl text-black" />
         </div>
 
-        <p className="text-center text-lg opacity-70">Atualizado: {data?.atualizadoEm}</p>
+        <p className="text-center text-2xl opacity-70">Atualizado: {data?.atualizadoEm}</p>
       </div>
     </div>
   );
