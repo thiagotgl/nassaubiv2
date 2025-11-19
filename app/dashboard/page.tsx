@@ -9,7 +9,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
   LabelList,
 } from 'recharts';
@@ -110,20 +109,16 @@ export default function Dashboard() {
                   fontSize={16}
                   tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                 />
-                <Tooltip
-                  formatter={(v) =>
-                    v.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })
-                  }
-                />
 
                 <Bar dataKey="valor" fill="#10b981" radius={20} barSize={32}>
                   <LabelList
                     dataKey="valorFormatado"
                     position="top"
-                    style={{ fill: '#ffffff', fontSize: 18, fontWeight: 700 }}
+                    style={{
+                      fill: '#0f172a',
+                      fontSize: 18,
+                      fontWeight: 700,
+                    }}
                   />
                 </Bar>
 
