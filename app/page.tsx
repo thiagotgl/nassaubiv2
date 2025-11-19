@@ -25,7 +25,7 @@ export default function Dashboard() {
       const meses = [];
       for (let i = 11; i >= 0; i--) {
         const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-        const inicio = data.toISOString().slice(0, 10);  // ← LINHA 100% LIMPA
+        const inicio = data.toISOString().slice(0, 10);
         const fimMes = new Date(data.getFullYear(), data.getMonth() + 1, 0);
         const fim = fimMes.toISOString().slice(0, 10);
         const nome = data.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
