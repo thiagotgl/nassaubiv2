@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import {
   ComposedChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -33,7 +32,7 @@ export default function Dashboard() {
 
       // FATURAMENTO DOS ÚLTIMOS 12 MESES
       const hoje = new Date();
-      const meses: { inicio: string; fim: string; nome: string }[] = [];
+      const meses = [];
 
       for (let i = 11; i >= 0; i--) {
         const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
@@ -43,48 +42,28 @@ export default function Dashboard() {
         const nome = data
           .toLocaleString('pt-BR', { month: 'short', year: 'numeric' })
           .replace('.', '');
+
         meses.push({ inicio, fim, nome });
       }
 
-      // Busca valores de faturamento por mês
-      const mensalBase = await Promise.all(
+      const mensalData = await Promise.all(
         meses.map(async ({ inicio, fim, nome }) => {
           const res = await fetch(
             `/api/faturamento?inicio=${inicio}&fim=${fim}`
           );
           const data = await res.json();
           const valor = data.valor_bruto || 0;
-          return { mes: nome, valor };
+
+          return {
+            mes: nome,
+            valor,
+            valorFormatado: valor.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            }),
+          };
         })
       );
-
-      // Calcula percentuais só para a linha (se quiser usar como no modelo)
-      const totalPeriodo = mensalBase.reduce(
-        (acc, item) => acc + (item.valor || 0),
-        0
-      );
-
-      const mensalData =
-        totalPeriodo > 0
-          ? mensalBase.map((item) => {
-              const perc = (item.valor / totalPeriodo) * 100;
-              return {
-                ...item,
-                valorFormatado: item.valor.toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                }),
-                percentual: perc,
-              };
-            })
-          : mensalBase.map((item) => ({
-              ...item,
-              valorFormatado: item.valor.toLocaleString('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }),
-              percentual: 0,
-            }));
 
       setHoje(hojeData);
       setMensal(mensalData);
@@ -126,7 +105,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* GRÁFICO MENSAL – VISUAL ESTILO DASHBOARD, COM VALOR BRUTO NO TOPO */}
+        {/* GRÁFICO MENSAL — APENAS BARRAS COM VALOR NO TOPO */}
         <section>
           <h2 className="text-5xl font-bold text-center mb-16">
             Evolução Mensal — Últimos 12 Meses
@@ -138,14 +117,12 @@ export default function Dashboard() {
                 data={mensal}
                 margin={{ top: 40, right: 40, left: 20, bottom: 40 }}
               >
-                {/* Grid suave */}
                 <CartesianGrid
                   stroke="#e5e7eb"
                   strokeOpacity={0.4}
                   vertical={false}
                 />
 
-                {/* Meses */}
                 <XAxis
                   dataKey="mes"
                   stroke="#6b7280"
@@ -153,30 +130,19 @@ export default function Dashboard() {
                   tickMargin={12}
                 />
 
-                {/* Eixos Y ocultos */}
-                <YAxis yAxisId="left" hide />
-                <YAxis yAxisId="right" orientation="right" hide />
-
-                {/* Linha pontilhada com a tendência (usando percentual, se quiser manter) */}
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="percentual"
-                  stroke="#60a5fa"
-                  strokeWidth={3}
-                  strokeDasharray="6 6"
-                  dot={{ r: 6, fill: '#1e3a8a' }}
+                <YAxis
+                  stroke="#9ca3af"
+                  fontSize={12}
+                  tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                 />
 
-                {/* Barras azul-escuras com VALOR BRUTO no topo */}
                 <Bar
-                  yAxisId="left"
                   dataKey="valor"
                   barSize={45}
                   radius={[6, 6, 0, 0]}
                   fill="#1e3a8a"
                 >
-                  {/* Valor bruto no topo da barra */}
+                  {/* VALOR BRUTO EM CIMA DA BARRA */}
                   <LabelList
                     dataKey="valorFormatado"
                     position="top"
