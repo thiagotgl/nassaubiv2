@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   ComposedChart,
   Bar,
-  Line,                // adicionado
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -23,10 +23,12 @@ export default function Dashboard() {
     const carregarTudo = async () => {
       setLoading(true);
 
+      // FATURAMENTO DO DIA HOJE
       const hojeStr = new Date().toISOString().slice(0, 10);
       const hojeRes = await fetch(`/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`);
       const hojeData = await hojeRes.json();
 
+      // FATURAMENTO DOS ÚLTIMOS 12 MESES
       const hoje = new Date();
       const meses = [];
       for (let i = 11; i >= 0; i--) {
@@ -77,10 +79,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
       <div className="max-w-7xl mx-auto p-8 space-y-32">
+
         <h1 className="text-7xl md:text-9xl font-black text-center bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-yellow-400 to-pink-500 drop-shadow-2xl">
           FATURAMENTO TOTAL CLÍNICA
         </h1>
 
+        {/* CARD DO DIA */}
         <section className="text-center">
           <div className="inline-block bg-white/10 backdrop-blur-3xl rounded-3xl p-20 shadow-2xl border border-white/30">
             <p className="text-5xl font-bold mb-8">Faturamento Hoje</p>
@@ -93,15 +97,28 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {/* GRÁFICO MENSAL COM OBSERVAÇÃO */}
         <section>
-          <h2 className="text-5xl font-bold text-center mb-16">
-            Evolução Mensal — Últimos 12 Meses
-          </h2>
-          <div className="bg-slate-50 rounded-3xl p-12 shadow-2xl">
+          <div className="text-center">
+            <h2 className="text-5xl font-bold mb-4">
+              Evolução Mensal — Últimos 12 Meses
+            </h2>
+
+            {/* OBSERVAÇÃO IMPORTANTE */}
+            <p className="text-lg md:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed opacity-90">
+              <span className="inline-block mr-2">ℹ️</span>
+              Os valores exibidos referem-se ao faturamento efetivamente registrado.{' '}
+              <strong>PDVs particulares</strong> aparecem somente após a efetivação no sistema e{' '}
+              <strong>convênios</strong> somente após o recebimento do crédito (repasse).
+            </p>
+          </div>
+
+          {/* GRÁFICO */}
+          <div className="mt-12 bg-slate-50 rounded-3xl p-12 shadow-2xl">
             <ResponsiveContainer width="100%" height={500}>
               <ComposedChart
                 data={mensal}
-                margin={{ top: 60, right: 40, left: 20, bottom: 40 }} {/* top aumentado pra caber a linha */}
+                margin={{ top: 60, right: 40, left: 20, bottom: 40 }}
               >
                 <CartesianGrid stroke="#e5e7eb" strokeOpacity={0.4} vertical={false} />
                 <XAxis dataKey="mes" stroke="#6b7280" fontSize={14} tickMargin={12} />
@@ -121,12 +138,12 @@ export default function Dashboard() {
                   <LabelList
                     dataKey="valorFormatado"
                     position="top"
-                    offset={18} /* aumentei um pouco pra não bater na linha */
+                    offset={18}
                     style={{ fill: '#1e3a8a', fontSize: 15, fontWeight: 700 }}
                   />
                 </Bar>
 
-                {/* LINHA TRACEJADA EM REAIS (exatamente como você queria) */}
+                {/* LINHA TRACEJADA EM REAIS */}
                 <Line
                   type="monotone"
                   dataKey="valor"
