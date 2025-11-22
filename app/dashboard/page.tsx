@@ -1,11 +1,10 @@
 // app/dashboard/page.tsx
 'use client';
-
 import { useState, useEffect } from 'react';
 import {
   ComposedChart,
   Bar,
-  Line,
+  Line,                    // <- adicionado
   XAxis,
   YAxis,
   CartesianGrid,
@@ -24,15 +23,14 @@ export default function Dashboard() {
     const carregarTudo = async () => {
       setLoading(true);
 
+      // FATURAMENTO DO DIA HOJE
       const hojeStr = new Date().toISOString().slice(0, 10);
-      const hojeRes = await fetch(
-        `/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`
-      );
+      const hojeRes = await fetch(`/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`);
       const hojeData = await hojeRes.json();
 
+      // FATURAMENTO DOS ÚLTIMOS 12 MESES
       const hoje = new Date();
       const meses = [];
-
       for (let i = 11; i >= 0; i--) {
         const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
         const inicio = data.toISOString().slice(0, 10);
@@ -46,36 +44,30 @@ export default function Dashboard() {
 
       const mensalBase = await Promise.all(
         meses.map(async ({ inicio, fim, nome }) => {
-          const res = await fetch(
-            `/api/faturamento?inicio=${inicio}&fim=${fim}`
-          );
+          const res = await fetch(`/api/faturamento?inicio=${inicio}&fim=${fim}`);
           const data = await res.json();
           const valor = data.valor_bruto || 0;
-          return { mes: nome, valor };
+          return {
+            mes: nome,
+            valor,
+            valorFormatado: valor.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            }),
+          };
         })
       );
 
-      const totalPeriodo = mensalBase.reduce(
-        (acc, item) => acc + (item.valor || 0),
-        0
-      );
-
-      const mensalData =
-        totalPeriodo > 0
-          ? mensalBase.map((item) => {
-              const perc = (item.valor / totalPeriodo) * 100;
-              return {
-                ...item,
-                percentual: perc,
-                percentualFormatado:
-                  perc.toFixed(2).replace('.', ',') + '%',
-              };
-            })
-          : mensalBase.map((item) => ({
-              ...item,
-              percentual: 0,
-              percentualFormatado: '0,00%',
-            }));
+      // === CÁLCULO DO PERCENTUAL PARA A LINHA TRACEJADA ===
+      const totalPeriodo = mensalBase.reduce((acc, item) => acc + item.valor, 0);
+      const mensalData = mensalBase.map(item => {
+        const percentual = totalPeriodo > 0 ? (item.valor / totalPeriodo) * 100 : 0;
+        return {
+          ...item,
+          percentual,
+          percentualFormatado: percentual.toFixed(2).replace('.', ',') + '%',
+        };
+      });
 
       setHoje(hojeData);
       setMensal(mensalData);
@@ -102,6 +94,7 @@ export default function Dashboard() {
           FATURAMENTO TOTAL CLÍNICA
         </h1>
 
+        {/* CARD DO DIA */}
         <section className="text-center">
           <div className="inline-block bg-white/10 backdrop-blur-3xl rounded-3xl p-20 shadow-2xl border border-white/30">
             <p className="text-5xl font-bold mb-8">Faturamento Hoje</p>
@@ -109,50 +102,33 @@ export default function Dashboard() {
               {hoje.faturamento}
             </p>
             <p className="text-3xl mt-10 opacity-80">
-              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", {
-                locale: ptBR,
-              })}
+              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </p>
           </div>
         </section>
 
+        {/* GRÁFICO MENSAL COM BARRAS + LINHA TRACEJADA */}
         <section>
           <h2 className="text-5xl font-bold text-center mb-16">
             Evolução Mensal — Últimos 12 Meses
           </h2>
-
           <div className="bg-slate-50 rounded-3xl p-12 shadow-2xl">
             <ResponsiveContainer width="100%" height={500}>
               <ComposedChart
                 data={mensal}
                 margin={{ top: 40, right: 40, left: 20, bottom: 40 }}
               >
-                <CartesianGrid
-                  stroke="#e5e7eb"
-                  strokeOpacity={0.4}
-                  vertical={false}
+                <CartesianGrid stroke="#e5e7eb" strokeOpacity={0.4} vertical={false} />
+                <XAxis dataKey="mes" stroke="#6b7280" fontSize={14} tickMargin={12} />
+                <YAxis
+                  yAxisId="left"
+                  stroke="#9ca3af"
+                  fontSize={12}
+                  tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                 />
+                <YAxis yAxisId="right" orientation="right" hide /> {/* eixo oculto pra linha */}
 
-                <XAxis
-                  dataKey="mes"
-                  stroke="#6b7280"
-                  fontSize={14}
-                  tickMargin={12}
-                />
-
-                <YAxis yAxisId="left" hide />
-                <YAxis yAxisId="right" orientation="right" hide />
-
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="percentual"
-                  stroke="#60a5fa"
-                  strokeWidth={3}
-                  strokeDasharray="6 6"
-                  dot={{ r: 6, fill: '#1e3a8a' }}
-                />
-
+                {/* BARRAS COM VALOR EM REAIS NO TOPO */}
                 <Bar
                   yAxisId="left"
                   dataKey="valor"
@@ -161,27 +137,24 @@ export default function Dashboard() {
                   fill="#1e3a8a"
                 >
                   <LabelList
-                    dataKey="valor"
-                    position="insideBottom"
-                    offset={-8}
-                    style={{
-                      fill: '#ffffff',
-                      fontSize: 14,
-                      fontWeight: 600,
-                    }}
-                  />
-
-                  <LabelList
-                    dataKey="percentualFormatado"
+                    dataKey="valorFormatado"
                     position="top"
                     offset={10}
-                    style={{
-                      fill: '#1e3a8a',
-                      fontSize: 14,
-                      fontWeight: 700,
-                    }}
+                    style={{ fill: '#1e3a8a', fontSize: 15, fontWeight: 700 }}
                   />
                 </Bar>
+
+                {/* LINHA TRACEJADA DO PERCENTUAL (igual ao primeiro gráfico) */}
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="percentual"
+                  stroke="#60a5fa"
+                  strokeWidth={3}
+                  strokeDasharray="6 6"
+                  dot={{ r: 6, fill: '#1e3a8a' }}
+                  name="Participação %"
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -194,6 +167,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-
-
