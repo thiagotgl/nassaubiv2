@@ -16,7 +16,8 @@ import { ptBR } from 'date-fns/locale';
 
 export default function Dashboard() {
   const [hoje, setHoje] = useState<any>(null);
-  const [mensal, setMensal] = useState<any[]>([]);
+  const [mensal, setMensal] = useState<any[]>([]);            // FATURAMENTO
+  const [mensalDespesas, setMensalDespesas] = useState<any[]>([]); // DESPESAS (segundo gráfico)
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,10 +26,12 @@ export default function Dashboard() {
 
       // FATURAMENTO DO DIA HOJE
       const hojeStr = new Date().toISOString().slice(0, 10);
-      const hojeRes = await fetch(`/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`);
+      const hojeRes = await fetch(
+        `/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`
+      );
       const hojeData = await hojeRes.json();
 
-      // FATURAMENTO DOS ÚLTIMOS 12 MESES
+      // FATURAMENTO / DESPESAS DOS ÚLTIMOS 12 MESES
       const hoje = new Date();
       const meses = [];
       for (let i = 11; i >= 0; i--) {
@@ -42,9 +45,35 @@ export default function Dashboard() {
         meses.push({ inicio, fim, nome });
       }
 
+      // FATURAMENTO MENSAL (gráfico azul)
       const mensalData = await Promise.all(
         meses.map(async ({ inicio, fim, nome }) => {
-          const res = await fetch(`/api/faturamento?inicio=${inicio}&fim=${fim}`);
+          const res = await fetch(
+            `/api/faturamento?inicio=${inicio}&fim=${fim}`
+          );
+          const data = await res.json();
+          const valor = data.valor_bruto || 0;
+          return {
+            mes: nome,
+            valor,
+            valorFormatado: valor.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            }),
+          };
+        })
+      );
+
+      // DESPESAS MENSAL (gráfico laranja)
+      // ⚠️ POR ENQUANTO usando o MESMO endpoint de faturamento,
+      // só para o layout aparecer. Depois é só trocar a URL para /api/despesas.
+      const mensalDespesasData = await Promise.all(
+        meses.map(async ({ inicio, fim, nome }) => {
+          const res = await fetch(
+            `/api/faturamento?inicio=${inicio}&fim=${fim}`
+            // quando existir o endpoint de despesas, troque por:
+            // `/api/despesas?inicio=${inicio}&fim=${fim}`
+          );
           const data = await res.json();
           const valor = data.valor_bruto || 0;
           return {
@@ -60,6 +89,7 @@ export default function Dashboard() {
 
       setHoje(hojeData);
       setMensal(mensalData);
+      setMensalDespesas(mensalDespesasData);
       setLoading(false);
     };
 
@@ -92,12 +122,14 @@ export default function Dashboard() {
               {hoje.faturamento}
             </p>
             <p className="text-3xl mt-10 opacity-80">
-              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", {
+                locale: ptBR,
+              })}
             </p>
           </div>
         </section>
 
-        {/* GRÁFICO MENSAL COM OBSERVAÇÃO */}
+        {/* GRÁFICO MENSAL COM OBSERVAÇÃO – FATURAMENTO (AZUL) */}
         <section>
           <div className="text-center">
             <h2 className="text-5xl font-bold mb-4">
@@ -107,28 +139,38 @@ export default function Dashboard() {
             {/* OBSERVAÇÃO IMPORTANTE */}
             <p className="text-lg md:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed opacity-90">
               <span className="inline-block mr-2">ℹ️</span>
-              Os valores exibidos referem-se ao faturamento efetivamente registrado.{' '}
-              <strong>PDVs particulares</strong> aparecem somente após a efetivação no sistema e{' '}
-              <strong>convênios</strong> somente após o recebimento do crédito (repasse).
+              Os valores exibidos referem-se ao faturamento efetivamente
+              registrado. <strong>PDVs particulares</strong> aparecem somente
+              após a efetivação no sistema e <strong>convênios</strong> somente
+              após o recebimento do crédito (repasse).
             </p>
           </div>
 
-          {/* GRÁFICO */}
+          {/* GRÁFICO – FATURAMENTO */}
           <div className="mt-12 bg-slate-50 rounded-3xl p-12 shadow-2xl">
             <ResponsiveContainer width="100%" height={500}>
               <ComposedChart
                 data={mensal}
                 margin={{ top: 60, right: 40, left: 20, bottom: 40 }}
               >
-                <CartesianGrid stroke="#e5e7eb" strokeOpacity={0.4} vertical={false} />
-                <XAxis dataKey="mes" stroke="#6b7280" fontSize={14} tickMargin={12} />
+                <CartesianGrid
+                  stroke="#e5e7eb"
+                  strokeOpacity={0.4}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="mes"
+                  stroke="#6b7280"
+                  fontSize={14}
+                  tickMargin={12}
+                />
                 <YAxis
                   stroke="#9ca3af"
                   fontSize={12}
                   tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                 />
 
-                {/* BARRAS */}
+                {/* BARRAS – FATURAMENTO */}
                 <Bar
                   dataKey="valor"
                   barSize={45}
@@ -139,7 +181,11 @@ export default function Dashboard() {
                     dataKey="valorFormatado"
                     position="top"
                     offset={18}
-                    style={{ fill: '#1e3a8a', fontSize: 15, fontWeight: 700 }}
+                    style={{
+                      fill: '#1e3a8a',
+                      fontSize: 15,
+                      fontWeight: 700,
+                    }}
                   />
                 </Bar>
 
@@ -150,9 +196,66 @@ export default function Dashboard() {
                   stroke="#60a5fa"
                   strokeWidth={4}
                   strokeDasharray="8 8"
-                  dot={{ r: 7, fill: '#1e3a8a', strokeWidth: 3, stroke: '#60a5fa' }}
+                  dot={{
+                    r: 7,
+                    fill: '#1e3a8a',
+                    strokeWidth: 3,
+                    stroke: '#60a5fa',
+                  }}
                   activeDot={{ r: 9 }}
                 />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        {/* NOVO GRÁFICO – DESPESAS (LARANJA) */}
+        <section>
+          <h2 className="text-5xl font-bold text-center mb-16">
+            Despesas Mensais — Últimos 12 Meses
+          </h2>
+
+          <div className="bg-orange-50 rounded-3xl p-12 shadow-2xl">
+            <ResponsiveContainer width="100%" height={500}>
+              <ComposedChart
+                data={mensalDespesas}
+                margin={{ top: 60, right: 40, left: 20, bottom: 40 }}
+              >
+                <CartesianGrid
+                  stroke="#fed7aa"
+                  strokeOpacity={0.5}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="mes"
+                  stroke="#9a3412"
+                  fontSize={14}
+                  tickMargin={12}
+                />
+                <YAxis
+                  stroke="#9a3412"
+                  fontSize={12}
+                  tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
+                />
+
+                {/* BARRAS – DESPESAS */}
+                <Bar
+                  dataKey="valor"
+                  barSize={45}
+                  radius={[6, 6, 0, 0]}
+                  fill="#ea580c"
+                >
+                  <LabelList
+                    dataKey="valorFormatado"
+                    position="top"
+                    offset={18}
+                    style={{
+                      fill: '#9a3412',
+                      fontSize: 15,
+                      fontWeight: 700,
+                    }}
+                  />
+                </Bar>
               </ComposedChart>
             </ResponsiveContainer>
           </div>
