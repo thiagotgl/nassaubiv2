@@ -1,5 +1,6 @@
 // app/dashboard/page.tsx
 'use client';
+
 import { useState, useEffect } from 'react';
 import {
   ComposedChart,
@@ -14,10 +15,20 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Converte "R$ 29.487,86" em número 29487.86
+function parseBRLToNumber(texto: string | null | undefined): number {
+  if (!texto) return 0;
+
+  const limpo = texto.replace(/[^\d,.-]/g, '');
+  const normalizado = limpo.replace(/\./g, '').replace(',', '.');
+  const n = Number(normalizado);
+  return Number.isFinite(n) ? n : 0;
+}
+
 export default function Dashboard() {
   const [hoje, setHoje] = useState<any>(null);
-  const [mensal, setMensal] = useState<any[]>([]);            // FATURAMENTO
-  const [mensalDespesas, setMensalDespesas] = useState<any[]>([]); // DESPESAS (segundo gráfico)
+  const [mensal, setMensal] = useState<any[]>([]); // Faturamento
+  const [mensalDespesas, setMensalDespesas] = useState<any[]>([]); // Despesas
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +44,8 @@ export default function Dashboard() {
 
       // FATURAMENTO / DESPESAS DOS ÚLTIMOS 12 MESES
       const hoje = new Date();
-      const meses = [];
+      const meses: { inicio: string; fim: string; nome: string }[] = [];
+
       for (let i = 11; i >= 0; i--) {
         const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
         const inicio = data.toISOString().slice(0, 10);
@@ -64,25 +76,28 @@ export default function Dashboard() {
         })
       );
 
-      // DESPESAS MENSAL (gráfico laranja)
-      // ⚠️ POR ENQUANTO usando o MESMO endpoint de faturamento,
-      // só para o layout aparecer. Depois é só trocar a URL para /api/despesas.
+      // DESPESAS MENSAL (gráfico laranja) – usando API externa Biodata
       const mensalDespesasData = await Promise.all(
         meses.map(async ({ inicio, fim, nome }) => {
-          const res = await fetch(
-            `/api/faturamento?inicio=${inicio}&fim=${fim}`
-            // quando existir o endpoint de despesas, troque por:
-            // `/api/despesas?inicio=${inicio}&fim=${fim}`
-          );
-          const data = await res.json();
-          const valor = data.valor_bruto || 0;
+          const url =
+            'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico' +
+            '?target_url=null' +
+            '&procedure=spBITotalDespesas' +
+            '&parametros=%40DATAINICIO,%40DATAFIM,%40UNIDADE' +
+            `&valores=${inicio},${fim},_,` +
+            '&idSAC=544';
+
+          const res = await fetch(url);
+          const json = await res.json();
+
+          // Ex.: "R$ 29.487,86"
+          const texto = json?.[0]?.['R$'] ?? 'R$ 0,00';
+          const valor = parseBRLToNumber(texto);
+
           return {
             mes: nome,
             valor,
-            valorFormatado: valor.toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL',
-            }),
+            valorFormatado: texto,
           };
         })
       );
@@ -109,7 +124,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
       <div className="max-w-7xl mx-auto p-8 space-y-32">
-
         <h1 className="text-7xl md:text-9xl font-black text-center bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-yellow-400 to-pink-500 drop-shadow-2xl">
           FATURAMENTO TOTAL CLÍNICA
         </h1>
@@ -189,7 +203,7 @@ export default function Dashboard() {
                   />
                 </Bar>
 
-                {/* LINHA TRACEJADA EM REAIS */}
+                {/* LINHA TRACEJADA EM REAIS – FATURAMENTO */}
                 <Line
                   type="monotone"
                   dataKey="valor"
