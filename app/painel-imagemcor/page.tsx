@@ -1,433 +1,365 @@
 // app/painel-imagemcor/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer,
-  LabelList,
   Tooltip,
+  ResponsiveContainer,
   Legend,
-  PieChart,
-  Pie,
-  Cell,
+  LabelList,
+  ComposedChart,
+  Line,
 } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// Converte "R$ 29.487,86" em número 29487.86
+/**
+ * Converte textos no padrão brasileiro ("R$ 29.487,86", "29.487,86")
+ * em número (29487.86).
+ */
 function parseBRLToNumber(texto: string | null | undefined): number {
   if (!texto) return 0;
-  const limpo = texto.replace(/[^\d,.-]/g, '');
-  const normalizado = limpo.replace(/\./g, '').replace(',', '.');
-  const n = Number(normalizado);
+  const limpo = texto.replace(/[^\d,.,-]/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(limpo);
   return Number.isFinite(n) ? n : 0;
 }
 
-// Converte qualquer coisa para número (para quantidades, etc.)
-function parseGenericNumber(v: any): number {
-  if (v == null) return 0;
-  if (typeof v === 'number') return v;
-  const str = String(v).trim();
-  if (!str) return 0;
-  const num = Number(str.replace(/[^\d.-]/g, ''));
-  return Number.isFinite(num) ? num : 0;
+// Tipagens básicas
+interface ConvenioRow {
+  nome: string;
+  valor: number;
+  valorFormatado: string;
 }
 
-// Formata número em BRL
-function formatBRL(v: number): string {
-  return v.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
+interface GrupoRow {
+  nome: string;
+  valor: number;
+  valorFormatado: string;
+}
+
+export default function PainelImagemCor() {
+  // Filtros
+  const [inicio, setInicio] = useState<string>(() => {
+    const hoje = new Date();
+    return hoje.toISOString().slice(0, 10);
   });
-}
 
-// Cores fixas para a pizza de convênios
-const PIE_COLORS = [
-  '#1d4ed8',
-  '#0f766e',
-  '#f97316',
-  '#a855f7',
-  '#22c55e',
-  '#e11d48',
-  '#06b6d4',
-  '#facc15',
-];
+  const [fim, setFim] = useState<string>(() => {
+    const hoje = new Date();
+    return hoje.toISOString().slice(0, 10);
+  });
 
-export default function ImagemCorDashboard() {
-  // Datas padrão: 1º dia do mês até hoje
-  const hoje = new Date();
-  const hojeISO = hoje.toISOString().slice(0, 10);
-  const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-    .toISOString()
-    .slice(0, 10);
-
-  const [dataInicio, setDataInicio] = useState<string>(primeiroDiaMes);
-  const [dataFim, setDataFim] = useState<string>(hojeISO);
-
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-
-  // Cards
-  const [volumeAtendimento, setVolumeAtendimento] = useState<number>(0); // R$
+  // KPIs
+  const [totalReceita, setTotalReceita] = useState<number>(0);
   const [novosPacientes, setNovosPacientes] = useState<number>(0);
-  const [ticketMedio, setTicketMedio] = useState<string>('R$ 0,00');
+  const [ticketMedio, setTicketMedio] = useState<number>(0);
 
   // Gráficos
-  const [porConvenio, setPorConvenio] = useState<any[]>([]);
-  const [porGrupo, setPorGrupo] = useState<any[]>([]);
+  const [porConvenio, setPorConvenio] = useState<ConvenioRow[]>([]);
+  const [porGrupo, setPorGrupo] = useState<GrupoRow[]>([]);
 
-  async function carregarTudo(inicio: string, fim: string) {
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Helper para montar URL da Biodata
+  const baseUrl =
+    'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico';
+
+  const carregarDados = async () => {
+    setLoading(true);
+
     try {
-      setLoading(true);
-      setErro(null);
+      // ========= 1) Faturamento por Convênio =========
+      {
+        const url =
+          `${baseUrl}` +
+          '?target_url=null' +
+          '&procedure=spBIFaturamentoPorConvenioValor' +
+          '&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional,%40UNIDADE' +
+          `&valores=${inicio},${fim},_,_,` +
+          '&idSAC=544';
 
-      // 1) Volume de atendimento (R$)
-      // Aqui estou usando o mesmo /api/faturamento que você já tem no outro painel.
-      // Se para essa empresa for diferente, depois trocamos apenas este trecho.
-      const totalRes = await fetch(
-        `/api/faturamento?inicio=${inicio}&fim=${fim}`
-      );
-      const totalJson = await totalRes.json();
-      const totalValor = totalJson?.valor_bruto ?? totalJson?.valor ?? 0;
-      const totalNumero =
-        typeof totalValor === 'number'
-          ? totalValor
-          : parseGenericNumber(totalValor);
-      setVolumeAtendimento(totalNumero);
+        const res = await fetch(url);
+        const json = await res.json();
 
-      // 2) APIs Biodata
+        const conv: ConvenioRow[] = (json ?? []).map((row: any, idx: number) => {
+          const nome =
+            row.Convenio ||
+            row.CONVENIO ||
+            row.convenio ||
+            row.Nome ||
+            `Convênio ${idx + 1}`;
 
-      // Novos pacientes
-      const urlNovos =
-        'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico' +
-        '?target_url=null' +
-        '&procedure=spBIPacientesCadastrados' +
-        '&parametros=%40DATAINICIO,%40DATAFIM,%40UNIDADE,%40CONVENIO,%40TIPOENTRADA' +
-        `&valores=${inicio},${fim},_,_,_,` +
-        '&idSAC=544';
+          const texto = row['R$'] ?? row.Valor ?? row.VALOR ?? 'R$ 0,00';
+          const valor = parseBRLToNumber(texto);
 
-      // Ticket médio
-      const urlTicket =
-        'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico' +
-        '?target_url=null' +
-        '&procedure=spBITicketMedioCard' +
-        '&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional' +
-        `&valores=${inicio},${fim},_` +
-        '&idSAC=544';
+          return {
+            nome,
+            valor,
+            valorFormatado: texto,
+          };
+        });
 
-      // Receita por convênio
-      const urlConvenio =
-        'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico' +
-        '?target_url=null' +
-        '&procedure=spBIFaturamentoPorConvenioValor' +
-        '&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional,%40UNIDADE' +
-        `&valores=${inicio},${fim},_,_` +
-        '&idSAC=544';
+        setPorConvenio(conv);
 
-      // Faturamento por grupo de procedimento
-      const urlGrupo =
-        'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico' +
-        '?target_url=null' +
-        '&procedure=spBIFaturamentoPorGrupodeProcedimentoValor' +
-        '&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional,%40UNIDADE,%40PROFISSIONAL' +
-        `&valores=${inicio},${fim},_,_,_` +
-        '&idSAC=544';
+        // Volume de atendimento em R$ = soma da receita por convênio
+        const total = conv.reduce((acc, item) => acc + item.valor, 0);
+        setTotalReceita(total);
+      }
 
-      const [novosRes, ticketRes, convRes, grupoRes] = await Promise.all([
-        fetch(urlNovos),
-        fetch(urlTicket),
-        fetch(urlConvenio),
-        fetch(urlGrupo),
-      ]);
+      // ========= 2) Novos Pacientes =========
+      {
+        const url =
+          `${baseUrl}` +
+          '?target_url=null' +
+          '&procedure=spBIPacientesCadastrados' +
+          '&parametros=%40DATAINICIO,%40DATAFIM,%40UNIDADE,%40CONVENIO,%40TIPOENTRADA' +
+          `&valores=${inicio},${fim},_,_,_,` +
+          '&idSAC=544';
 
-      const [novosJson, ticketJson, convJson, grupoJson] = await Promise.all([
-        novosRes.json(),
-        ticketRes.json(),
-        convRes.json(),
-        grupoRes.json(),
-      ]);
+        const res = await fetch(url);
+        const json = await res.json();
+        const row = json?.[0] ?? {};
 
-      // ---- Novos Pacientes ----
-      const npRow = novosJson?.[0] ?? {};
-      const npValor =
-        npRow.TOTAL ??
-        npRow.total ??
-        npRow.Qtde ??
-        npRow.QTD ??
-        npRow.Quantidade ??
-        npRow.Pacientes ??
-        0;
-      setNovosPacientes(parseGenericNumber(npValor));
+        const qtd =
+          Number(row.Qtd ?? row.QTD ?? row.Quantidade ?? row.PACIENTES ?? 0) ||
+          0;
 
-      // ---- Ticket Médio ----
-      const tkRow = ticketJson?.[0] ?? {};
-      const tkTexto =
-        tkRow['R$'] ??
-        tkRow.valor_formatado ??
-        tkRow.VALOR_FORMATADO ??
-        tkRow.VALOR ??
-        tkRow.valor ??
-        'R$ 0,00';
-      setTicketMedio(String(tkTexto));
+        setNovosPacientes(qtd);
+      }
 
-      // ---- Receita por Convênio ----
-      const convData =
-        Array.isArray(convJson) && convJson.length > 0
-          ? convJson.map((item: any, idx: number) => {
-              const nome =
-                item.Convenio ??
-                item.CONVENIO ??
-                item.convenio ??
-                item.Nome ??
-                item.NOME ??
-                `Convênio ${idx + 1}`;
+      // ========= 3) Ticket Médio =========
+      {
+        const url =
+          `${baseUrl}` +
+          '?target_url=null' +
+          '&procedure=spBITicketMedioCard' +
+          '&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional' +
+          `&valores=${inicio},${fim},_` +
+          '&idSAC=544';
 
-              const textoValor =
-                item['R$'] ??
-                item.valor_formatado ??
-                item.VALOR_FORMATADO ??
-                item.VALOR ??
-                item.valor ??
-                'R$ 0,00';
+        const res = await fetch(url);
+        const json = await res.json();
+        const row = json?.[0] ?? {};
 
-              const valorNum = parseBRLToNumber(textoValor);
+        const texto =
+          row['R$'] ??
+          row.TICKETMEDIO ??
+          row.TicketMedio ??
+          row.Ticket ??
+          'R$ 0,00';
 
-              return {
-                convenio: String(nome),
-                valor: valorNum,
-                valorFormatado:
-                  typeof textoValor === 'string'
-                    ? textoValor
-                    : formatBRL(valorNum),
-              };
-            })
-          : [];
+        const valor = parseBRLToNumber(texto);
+        setTicketMedio(valor);
+      }
 
-      setPorConvenio(convData);
+      // ========= 4) Faturamento por Grupo de Procedimento =========
+      {
+        const url =
+          `${baseUrl}` +
+          '?target_url=null' +
+          '&procedure=spBIFaturamentoPorGrupodeProcedimentoValor' +
+          '&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional,%40UNIDADE,%40PROFISSIONAL' +
+          `&valores=${inicio},${fim},_,_,_,` +
+          '&idSAC=544';
 
-      // ---- Faturamento por Grupo de Procedimento ----
-      const grpData =
-        Array.isArray(grupoJson) && grupoJson.length > 0
-          ? grupoJson.map((item: any, idx: number) => {
-              const grupo =
-                item.Grupo ??
-                item.GRUPO ??
-                item.GrupoProcedimento ??
-                item.GRUPO_PROCEDIMENTO ??
-                `Grupo ${idx + 1}`;
+        const res = await fetch(url);
+        const json = await res.json();
 
-              const textoValor =
-                item['R$'] ??
-                item.valor_formatado ??
-                item.VALOR_FORMATADO ??
-                item.VALOR ??
-                item.valor ??
-                'R$ 0,00';
+        const grupos: GrupoRow[] = (json ?? []).map((row: any, idx: number) => {
+          const nome =
+            row.Grupo ||
+            row.GRUPO ||
+            row.GrupoProcedimento ||
+            row.Nome ||
+            `Grupo ${idx + 1}`;
 
-              const qtd =
-                item.Qtd ??
-                item.QTD ??
-                item.Quantidade ??
-                item.QTDE ??
-                item.QTDE_TOTAL ??
-                0;
+          const texto = row['R$'] ?? row.Valor ?? row.VALOR ?? 'R$ 0,00';
+          const valor = parseBRLToNumber(texto);
 
-              const valorNum = parseBRLToNumber(textoValor);
-              const qtdNum = parseGenericNumber(qtd);
+          return {
+            nome,
+            valor,
+            valorFormatado: texto,
+          };
+        });
 
-              return {
-                grupo: String(grupo),
-                valor: valorNum,
-                valorFormatado:
-                  typeof textoValor === 'string'
-                    ? textoValor
-                    : formatBRL(valorNum),
-                quantidade: qtdNum,
-              };
-            })
-          : [];
-
-      setPorGrupo(grpData);
-    } catch (e: any) {
-      console.error(e);
-      setErro('Erro ao carregar dados. Tente novamente mais tarde.');
+        setPorGrupo(grupos);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados do painel ImagemCor:', err);
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    carregarTudo(dataInicio, dataFim);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleAplicarFiltros = () => {
-    carregarTudo(dataInicio, dataFim);
   };
 
+  // Carregar ao montar e sempre que trocar o período
+  useEffect(() => {
+    carregarDados();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicio, fim]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <p className="text-4xl md:text-6xl font-bold animate-pulse">
+          Carregando painel ImagemCor...
+        </p>
+      </div>
+    );
+  }
+
+  const totalReceitaFormatado = totalReceita.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+  const ticketMedioFormatado = ticketMedio.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-      <div className="max-w-7xl mx-auto p-8 space-y-16">
-        {/* TÍTULO */}
-        <header className="space-y-4 text-center">
-          <h1 className="text-4xl md:text-6xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-yellow-400 to-pink-500 drop-shadow-2xl">
-            Painel Financeiro & Atendimentos — ImagemCor
-          </h1>
-          <p className="text-lg md:text-xl text-gray-200 opacity-80">
-            Dados integrados ao Biodata — atualizados conforme o período
-            selecionado.
-          </p>
-        </header>
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="max-w-7xl mx-auto px-6 py-10 space-y-12">
+        {/* TÍTULO E PERÍODO */}
+        <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight">
+              Painel Financeiro — ImagemCor
+            </h1>
+            <p className="mt-2 text-slate-300 text-lg">
+              Período:{' '}
+              <span className="font-semibold">
+                {format(new Date(inicio), "dd 'de' MMMM 'de' yyyy", {
+                  locale: ptBR,
+                })}{' '}
+                —{' '}
+                {format(new Date(fim), "dd 'de' MMMM 'de' yyyy", {
+                  locale: ptBR,
+                })}
+              </span>
+            </p>
+          </div>
 
-        {/* FILTRO DE DATAS */}
-        <section className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 shadow-2xl border border-white/20">
-          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 justify-between">
-            <div className="flex flex-col md:flex-row gap-4 md:gap-6 w-full md:w-auto">
-              <label className="flex flex-col text-sm md:text-base">
-                <span className="mb-1 text-gray-200">Data Início</span>
-                <input
-                  type="date"
-                  value={dataInicio}
-                  onChange={(e) => setDataInicio(e.target.value)}
-                  className="rounded-xl px-3 py-2 text-slate-900 text-sm md:text-base"
-                />
-              </label>
+          {/* FILTROS DE DATA */}
+          <div className="flex flex-wrap items-center gap-3 bg-slate-900/70 px-4 py-3 rounded-2xl border border-slate-700/60">
+            <div className="flex flex-col text-sm">
+              <span className="text-slate-400 mb-1">Data inicial</span>
+              <input
+                type="date"
+                value={inicio}
+                onChange={(e) => setInicio(e.target.value)}
+                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
 
-              <label className="flex flex-col text-sm md:text-base">
-                <span className="mb-1 text-gray-200">Data Fim</span>
-                <input
-                  type="date"
-                  value={dataFim}
-                  onChange={(e) => setDataFim(e.target.value)}
-                  className="rounded-xl px-3 py-2 text-slate-900 text-sm md:text-base"
-                />
-              </label>
+            <div className="flex flex-col text-sm">
+              <span className="text-slate-400 mb-1">Data final</span>
+              <input
+                type="date"
+                value={fim}
+                onChange={(e) => setFim(e.target.value)}
+                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
             </div>
 
             <button
-              onClick={handleAplicarFiltros}
-              disabled={loading}
-              className="mt-2 md:mt-0 inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed font-semibold text-lg shadow-lg shadow-emerald-500/40 transition"
+              type="button"
+              onClick={carregarDados}
+              className="mt-4 md:mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-semibold text-sm shadow-md hover:bg-amber-400 transition"
             >
-              {loading ? 'Atualizando...' : 'Aplicar filtros'}
+              Atualizar dados
             </button>
           </div>
+        </header>
 
-          <p className="mt-4 text-sm text-gray-200 opacity-70">
-            Período atual:{' '}
-            <span className="font-semibold">
-              {format(new Date(dataInicio), 'dd/MM/yyyy', { locale: ptBR })} a{' '}
-              {format(new Date(dataFim), 'dd/MM/yyyy', { locale: ptBR })}
-            </span>
-          </p>
-
-          {erro && (
-            <p className="mt-3 text-sm text-red-300 bg-red-900/40 px-4 py-2 rounded-2xl inline-block">
-              {erro}
-            </p>
-          )}
-        </section>
-
-        {/* CARDS RESUMO */}
+        {/* CARDS DE KPI */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Volume de atendimento (R$) */}
-          <div className="bg-white/10 rounded-3xl p-6 shadow-xl border border-white/20">
-            <p className="text-sm uppercase tracking-wide text-gray-300">
+          {/* Volume total em R$ */}
+          <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-700/60 shadow-lg">
+            <p className="text-sm font-medium text-slate-400">
               Volume de atendimento (R$)
             </p>
-            <p className="mt-4 text-3xl md:text-4xl font-black text-emerald-400">
-              {formatBRL(volumeAtendimento)}
+            <p className="mt-3 text-3xl md:text-4xl font-black text-amber-400">
+              {totalReceitaFormatado}
             </p>
-            <p className="mt-2 text-sm text-gray-300 opacity-80">
-              Total faturado no período selecionado (todas as unidades /
-              convênios).
+            <p className="mt-2 text-xs text-slate-500">
+              Soma da receita por convênio no período selecionado.
             </p>
           </div>
 
           {/* Novos pacientes */}
-          <div className="bg-white/10 rounded-3xl p-6 shadow-xl border border-white/20">
-            <p className="text-sm uppercase tracking-wide text-gray-300">
+          <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-700/60 shadow-lg">
+            <p className="text-sm font-medium text-slate-400">
               Novos pacientes
             </p>
-            <p className="mt-4 text-3xl md:text-4xl font-black text-sky-400">
-              {novosPacientes}
+            <p className="mt-3 text-3xl md:text-4xl font-black text-emerald-400">
+              {novosPacientes.toLocaleString('pt-BR')}
             </p>
-            <p className="mt-2 text-sm text-gray-300 opacity-80">
-              Pacientes cadastrados no sistema dentro do período.
+            <p className="mt-2 text-xs text-slate-500">
+              Pacientes cadastrados no período.
             </p>
           </div>
 
           {/* Ticket médio */}
-          <div className="bg-white/10 rounded-3xl p-6 shadow-xl border border-white/20">
-            <p className="text-sm uppercase tracking-wide text-gray-300">
-              Ticket médio por paciente
+          <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-700/60 shadow-lg">
+            <p className="text-sm font-medium text-slate-400">Ticket médio</p>
+            <p className="mt-3 text-3xl md:text-4xl font-black text-sky-400">
+              {ticketMedioFormatado}
             </p>
-            <p className="mt-4 text-3xl md:text-4xl font-black text-amber-300">
-              {ticketMedio}
-            </p>
-            <p className="mt-2 text-sm text-gray-300 opacity-80">
-              Valor médio faturado por paciente no período.
+            <p className="mt-2 text-xs text-slate-500">
+              Valor médio por atendimento no período.
             </p>
           </div>
         </section>
 
-        {/* RECEITA POR CONVÊNIO – BARRAS HORIZONTAIS + PIZZA */}
-        <section className="space-y-8">
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Receita por Convênio
+        {/* GRÁFICOS PRINCIPAIS */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          {/* RECEITA POR CONVÊNIO */}
+          <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-700/60 shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">
+              Receita por Convênio (R$)
             </h2>
-            <p className="text-sm md:text-base text-gray-200 opacity-80 max-w-2xl mx-auto">
-              Comparação de valores em reais entre convênios e participação de
-              cada um no total.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Barras horizontais */}
-            <div className="bg-slate-50 rounded-3xl p-6 md:p-8 shadow-2xl">
-              <ResponsiveContainer width="100%" height={380}>
+            <div className="w-full h-80">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={porConvenio}
-                  layout="vertical"
-                  margin={{ top: 20, right: 40, left: 80, bottom: 20 }}
+                  margin={{ top: 20, right: 20, left: 0, bottom: 40 }}
                 >
-                  <CartesianGrid stroke="#e5e7eb" strokeOpacity={0.7} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis
-                    type="number"
-                    tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
+                    dataKey="nome"
+                    angle={-30}
+                    textAnchor="end"
+                    interval={0}
+                    height={60}
+                    tick={{ fill: '#9ca3af', fontSize: 11 }}
                   />
                   <YAxis
-                    type="category"
-                    dataKey="convenio"
-                    width={120}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fill: '#9ca3af', fontSize: 11 }}
+                    tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
-                    formatter={(value: any, _name: any, entry: any) =>
-                      entry.payload?.valorFormatado ??
-                      formatBRL(value as number)
+                    formatter={(v: any) =>
+                      Number(v).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })
                     }
-                    labelFormatter={(label) => `Convênio: ${label}`}
                   />
-                  <Bar
-                    dataKey="valor"
-                    barSize={22}
-                    radius={[0, 10, 10, 0]}
-                    fill="#1d4ed8"
-                  >
+                  <Legend />
+                  <Bar dataKey="valor" fill="#fb923c" radius={[8, 8, 0, 0]}>
                     <LabelList
                       dataKey="valorFormatado"
-                      position="right"
-                      offset={8}
+                      position="top"
+                      formatter={(v: any) => v}
                       style={{
-                        fill: '#1f2937',
                         fontSize: 11,
+                        fill: '#fed7aa',
                         fontWeight: 600,
                       }}
                     />
@@ -435,155 +367,108 @@ export default function ImagemCorDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          </div>
 
-            {/* Pizza de participação */}
-            <div className="bg-slate-50 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col items-center justify-center">
-              <ResponsiveContainer width="100%" height={380}>
-                <PieChart>
-                  <Pie
-                    data={porConvenio}
-                    dataKey="valor"
-                    nameKey="convenio"
-                    innerRadius={70}
-                    outerRadius={120}
-                    paddingAngle={3}
-                  >
-                    {porConvenio.map((entry, index) => (
-                      <Cell
-                        key={entry.convenio}
-                        fill={PIE_COLORS[index % PIE_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
+          {/* RECEITA POR GRUPO DE PROCEDIMENTO */}
+          <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-700/60 shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">
+              Receita por Grupo de Procedimento (R$)
+            </h2>
+            <div className="w-full h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={porGrupo}
+                  margin={{ top: 20, right: 20, left: 0, bottom: 40 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                  <XAxis
+                    dataKey="nome"
+                    angle={-30}
+                    textAnchor="end"
+                    interval={0}
+                    height={60}
+                    tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  />
+                  <YAxis
+                    tick={{ fill: '#9ca3af', fontSize: 11 }}
+                    tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
+                  />
                   <Tooltip
-                    formatter={(value: any, _name: any, entry: any) => [
-                      entry?.payload?.valorFormatado ??
-                        formatBRL(value as number),
-                      entry?.payload?.convenio ?? 'Convênio',
-                    ]}
+                    formatter={(v: any) =>
+                      Number(v).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })
+                    }
                   />
-                  <Legend
-                    verticalAlign="bottom"
-                    align="center"
-                    iconType="circle"
-                    wrapperStyle={{ fontSize: 11 }}
-                  />
-                </PieChart>
+                  <Legend />
+                  <Bar dataKey="valor" fill="#a855f7" radius={[8, 8, 0, 0]}>
+                    <LabelList
+                      dataKey="valorFormatado"
+                      position="top"
+                      formatter={(v: any) => v}
+                      style={{
+                        fontSize: 11,
+                        fill: '#ddd6fe',
+                        fontWeight: 600,
+                      }}
+                    />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
-              <p className="mt-2 text-xs text-gray-500 text-center">
-                Gráfico de pizza mostrando a participação percentual de cada
-                convênio na receita total.
-              </p>
             </div>
           </div>
         </section>
 
-        {/* GRUPO DE PROCEDIMENTO – VALOR + QUANTIDADE */}
-        <section className="space-y-8">
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Faturamento por Grupo de Procedimento
-            </h2>
-            <p className="text-sm md:text-base text-gray-200 opacity-80 max-w-2xl mx-auto">
-              Comparação do valor faturado (R$) e da quantidade de
-              atendimentos por grupo de procedimento.
-            </p>
-          </div>
-
-          <div className="bg-slate-50 rounded-3xl p-6 md:p-10 shadow-2xl">
-            <ResponsiveContainer width="100%" height={420}>
-              <BarChart
+        {/* GRÁFICO COMPLEMENTAR – COMPARAÇÃO ENTRE GRUPOS */}
+        <section className="bg-slate-900/80 rounded-3xl p-6 border border-slate-700/60 shadow-lg">
+          <h2 className="text-xl font-semibold mb-4">
+            Comparativo entre Grupos (linha + barras)
+          </h2>
+          <div className="w-full h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
                 data={porGrupo}
-                margin={{ top: 20, right: 40, left: 20, bottom: 80 }}
+                margin={{ top: 20, right: 40, left: 0, bottom: 40 }}
               >
-                <CartesianGrid
-                  stroke="#e5e7eb"
-                  strokeOpacity={0.7}
-                  vertical={false}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                 <XAxis
-                  dataKey="grupo"
-                  tick={{ fontSize: 11 }}
-                  angle={-25}
+                  dataKey="nome"
+                  angle={-30}
                   textAnchor="end"
-                  height={80}
+                  interval={0}
+                  height={60}
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
                 />
                 <YAxis
-                  yAxisId="left"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
                   tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
                 />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fontSize: 11 }}
-                />
                 <Tooltip
-                  formatter={(value: any, name: any, entry: any) => {
-                    if (name === 'valor') {
-                      return [
-                        entry.payload?.valorFormatado ??
-                          formatBRL(value as number),
-                        'Valor (R$)',
-                      ];
-                    }
-                    if (name === 'quantidade') {
-                      return [value, 'Quantidade'];
-                    }
-                    return [value, name];
-                  }}
-                  labelFormatter={(label) => `Grupo: ${label}`}
+                  formatter={(v: any) =>
+                    Number(v).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })
+                  }
                 />
                 <Legend />
-
-                {/* Valor em R$ */}
-                <Bar
-                  yAxisId="left"
+                <Bar dataKey="valor" fill="#22c55e" radius={[6, 6, 0, 0]} />
+                <Line
+                  type="monotone"
                   dataKey="valor"
-                  name="Valor (R$)"
-                  barSize={26}
-                  radius={[10, 10, 0, 0]}
-                  fill="#0f766e"
-                >
-                  <LabelList
-                    dataKey="valorFormatado"
-                    position="top"
-                    offset={6}
-                    style={{
-                      fill: '#065f46',
-                      fontSize: 10,
-                      fontWeight: 600,
-                    }}
-                  />
-                </Bar>
-
-                {/* Quantidade */}
-                <Bar
-                  yAxisId="right"
-                  dataKey="quantidade"
-                  name="Quantidade"
-                  barSize={16}
-                  radius={[10, 10, 0, 0]}
-                  fill="#f97316"
-                >
-                  <LabelList
-                    dataKey="quantidade"
-                    position="insideTop"
-                    offset={4}
-                    style={{
-                      fill: '#ffffff',
-                      fontSize: 10,
-                      fontWeight: 600,
-                    }}
-                  />
-                </Bar>
-              </BarChart>
+                  stroke="#38bdf8"
+                  strokeWidth={3}
+                  dot={{ r: 5 }}
+                  activeDot={{ r: 7 }}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </section>
 
-        <footer className="text-center pb-10 text-sm md:text-base opacity-70">
-          Powered by Nassau Tecnologia · Integração Biodata ·{' '}
-          {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+        <footer className="pb-10 text-center text-xs text-slate-500">
+          Dados provenientes do Biodata — ImagemCor • Painel em construção
         </footer>
       </div>
     </div>
