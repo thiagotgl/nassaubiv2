@@ -16,9 +16,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-/**
- * Converte textos tipo "R$ 29.487,86" em número 29487.86
- */
+// Converte "R$ 29.487,86" em número 29487.86
 function parseBRLToNumber(texto: string | null | undefined): number {
   if (!texto) return 0;
   const limpo = texto.replace(/[^\d,.,-]/g, '').replace(/\./g, '').replace(',', '.');
@@ -26,9 +24,7 @@ function parseBRLToNumber(texto: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/**
- * Converte valores genéricos (string/number) em número
- */
+// Converte qualquer coisa em número
 function parseGenericNumber(v: any): number {
   if (v == null) return 0;
   if (typeof v === 'number') return v;
@@ -52,7 +48,6 @@ interface GrupoRow {
 }
 
 export default function PainelImagemCorPage() {
-  // Datas padrão: hoje
   const hoje = new Date();
   const hojeISO = hoje.toISOString().slice(0, 10);
 
@@ -79,7 +74,7 @@ export default function PainelImagemCorPage() {
       setLoading(true);
       setErro(null);
 
-      // ========== 1) Receita por Convênio ==========
+      // 1) Receita por convênio
       const urlConvenio =
         `${baseUrl}` +
         '?target_url=null' +
@@ -126,12 +121,10 @@ export default function PainelImagemCorPage() {
       );
 
       setPorConvenio(convData);
-
-      // Volume total em R$ (soma por convênio)
       const total = convData.reduce((acc, item) => acc + item.valor, 0);
       setTotalReceita(total);
 
-      // ========== 2) Novos Pacientes ==========
+      // 2) Novos pacientes
       const urlNovos =
         `${baseUrl}` +
         '?target_url=null' +
@@ -152,7 +145,7 @@ export default function PainelImagemCorPage() {
         0;
       setNovosPacientes(parseGenericNumber(npValor));
 
-      // ========== 3) Ticket Médio ==========
+      // 3) Ticket médio
       const urlTicket =
         `${baseUrl}` +
         '?target_url=null' +
@@ -174,7 +167,7 @@ export default function PainelImagemCorPage() {
       const tkValor = parseBRLToNumber(tkTexto);
       setTicketMedio(tkValor);
 
-      // ========== 4) Faturamento por Grupo de Procedimento ==========
+      // 4) Faturamento por grupo de procedimento
       const urlGrupo =
         `${baseUrl}` +
         '?target_url=null' +
@@ -237,7 +230,6 @@ export default function PainelImagemCorPage() {
     }
   }
 
-  // Carrega na montagem inicial
   useEffect(() => {
     carregarDados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,41 +244,116 @@ export default function PainelImagemCorPage() {
     currency: 'BRL',
   });
 
+  // Estilos base simples (sem Tailwind)
+  const containerStyle: React.CSSProperties = {
+    minHeight: '100vh',
+    backgroundColor: '#f3f4f6',
+    color: '#020617',
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, system-ui, -system-ui, sans-serif',
+  };
+
+  const wrapperStyle: React.CSSProperties = {
+    maxWidth: '1120px',
+    margin: '0 auto',
+    padding: '32px 16px 40px',
+  };
+
+  const cardGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '16px',
+  };
+
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '16px 20px',
+    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
+    border: '1px solid #e5e7eb',
+  };
+
+  const chartSectionStyle: React.CSSProperties = {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '16px 20px',
+    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
+    border: '1px solid #e5e7eb',
+    marginTop: '24px',
+  };
+
+  const chartContainerStyle: React.CSSProperties = {
+    width: '100%',
+    height: 320, // AQUI garantimos altura fixa (gráfico aparece)
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
-        {/* TÍTULO E PERÍODO */}
-        <header className="space-y-3">
-          <h1 className="text-3xl md:text-4xl font-black">
+    <div style={containerStyle}>
+      <div style={wrapperStyle}>
+        {/* TÍTULO */}
+        <header style={{ marginBottom: '24px' }}>
+          <h1
+            style={{
+              fontSize: '28px',
+              fontWeight: 900,
+              marginBottom: '8px',
+            }}
+          >
             Painel Financeiro — ImagemCor
           </h1>
-          <p className="text-sm md:text-base text-slate-600">
+          <p style={{ fontSize: '14px', color: '#4b5563' }}>
             Período:{' '}
-            <span className="font-semibold">
-              {format(new Date(inicio), "dd/MM/yyyy")} até{' '}
-              {format(new Date(fim), "dd/MM/yyyy")}
-            </span>
+            <strong>
+              {format(new Date(inicio), 'dd/MM/yyyy', { locale: ptBR })} até{' '}
+              {format(new Date(fim), 'dd/MM/yyyy', { locale: ptBR })}
+            </strong>
           </p>
 
-          {/* FILTROS DE DATA */}
-          <div className="mt-4 flex flex-wrap items-end gap-4 bg-white rounded-2xl px-4 py-3 shadow-sm border border-slate-200">
-            <div className="flex flex-col text-sm">
-              <span className="text-slate-500 mb-1">Data inicial</span>
+          {/* FILTROS */}
+          <div
+            style={{
+              marginTop: '16px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-end',
+              gap: '12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: '12px', color: '#6b7280' }}>
+                Data inicial
+              </label>
               <input
                 type="date"
                 value={inicio}
                 onChange={(e) => setInicio(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-1 text-sm"
+                style={{
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  padding: '4px 8px',
+                  fontSize: '13px',
+                }}
               />
             </div>
 
-            <div className="flex flex-col text-sm">
-              <span className="text-slate-500 mb-1">Data final</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: '12px', color: '#6b7280' }}>
+                Data final
+              </label>
               <input
                 type="date"
                 value={fim}
                 onChange={(e) => setFim(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-1 text-sm"
+                style={{
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  padding: '4px 8px',
+                  fontSize: '13px',
+                }}
               />
             </div>
 
@@ -294,71 +361,145 @@ export default function PainelImagemCorPage() {
               type="button"
               onClick={carregarDados}
               disabled={loading}
-              className="mt-2 md:mt-0 inline-flex items-center justify-center rounded-lg px-4 py-2 bg-emerald-500 text-white font-semibold text-sm shadow hover:bg-emerald-400 disabled:opacity-60"
+              style={{
+                marginTop: '18px',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                border: 'none',
+                backgroundColor: loading ? '#9ca3af' : '#10b981',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: loading ? 'default' : 'pointer',
+              }}
             >
               {loading ? 'Atualizando...' : 'Atualizar dados'}
             </button>
 
             {erro && (
-              <span className="text-sm text-red-600 ml-auto">{erro}</span>
+              <span style={{ fontSize: '12px', color: '#dc2626' }}>{erro}</span>
             )}
           </div>
         </header>
 
-        {/* CARDS DE KPI */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Volume total em R$ */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+        {/* CARDS KPIs */}
+        <section style={cardGridStyle}>
+          {/* Volume de atendimento */}
+          <div style={cardStyle}>
+            <p
+              style={{
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                color: '#6b7280',
+                letterSpacing: '0.06em',
+              }}
+            >
               Volume de atendimento (R$)
             </p>
-            <p className="mt-3 text-2xl md:text-3xl font-black text-emerald-600">
+            <p
+              style={{
+                marginTop: '8px',
+                fontSize: '22px',
+                fontWeight: 900,
+                color: '#047857',
+              }}
+            >
               {totalReceitaFormatado}
             </p>
-            <p className="mt-2 text-xs text-slate-500">
+            <p
+              style={{
+                marginTop: '6px',
+                fontSize: '11px',
+                color: '#6b7280',
+              }}
+            >
               Soma da receita por convênio no período selecionado.
             </p>
           </div>
 
           {/* Novos pacientes */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <div style={cardStyle}>
+            <p
+              style={{
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                color: '#6b7280',
+                letterSpacing: '0.06em',
+              }}
+            >
               Novos pacientes
             </p>
-            <p className="mt-3 text-2xl md:text-3xl font-black text-sky-600">
+            <p
+              style={{
+                marginTop: '8px',
+                fontSize: '22px',
+                fontWeight: 900,
+                color: '#0ea5e9',
+              }}
+            >
               {novosPacientes.toLocaleString('pt-BR')}
             </p>
-            <p className="mt-2 text-xs text-slate-500">
+            <p
+              style={{
+                marginTop: '6px',
+                fontSize: '11px',
+                color: '#6b7280',
+              }}
+            >
               Pacientes cadastrados no período.
             </p>
           </div>
 
           {/* Ticket médio */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <div style={cardStyle}>
+            <p
+              style={{
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                color: '#6b7280',
+                letterSpacing: '0.06em',
+              }}
+            >
               Ticket médio
             </p>
-            <p className="mt-3 text-2xl md:text-3xl font-black text-amber-600">
+            <p
+              style={{
+                marginTop: '8px',
+                fontSize: '22px',
+                fontWeight: 900,
+                color: '#d97706',
+              }}
+            >
               {ticketMedioFormatado}
             </p>
-            <p className="mt-2 text-xs text-slate-500">
+            <p
+              style={{
+                marginTop: '6px',
+                fontSize: '11px',
+                color: '#6b7280',
+              }}
+            >
               Valor médio por atendimento no período.
             </p>
           </div>
         </section>
 
-        {/* GRÁFICO 1 – RECEITA POR CONVÊNIO */}
-        <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
-          <div>
-            <h2 className="text-lg md:text-xl font-semibold">
-              Receita por Convênio (R$)
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Comparação do faturamento por convênio no período selecionado.
-            </p>
-          </div>
+        {/* GRÁFICO 1 – Receita por Convênio */}
+        <section style={chartSectionStyle}>
+          <h2
+            style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              marginBottom: '4px',
+            }}
+          >
+            Receita por Convênio (R$)
+          </h2>
+          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+            Comparação do faturamento por convênio no período selecionado.
+          </p>
 
-          <div className="w-full h-80">
+          <div style={chartContainerStyle}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={porConvenio}
@@ -386,7 +527,7 @@ export default function PainelImagemCorPage() {
                   }
                 />
                 <Legend />
-                <Bar dataKey="valor" fill="#fb923c" radius={[8, 8, 0, 0]}>
+                <Bar dataKey="valor" fill="#fb923c">
                   <LabelList
                     dataKey="valorFormatado"
                     position="top"
@@ -402,18 +543,22 @@ export default function PainelImagemCorPage() {
           </div>
         </section>
 
-        {/* GRÁFICO 2 – RECEITA POR GRUPO */}
-        <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
-          <div>
-            <h2 className="text-lg md:text-xl font-semibold">
-              Receita por Grupo de Procedimento (R$)
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Valor faturado por grupo de procedimento no período.
-            </p>
-          </div>
+        {/* GRÁFICO 2 – Receita por Grupo */}
+        <section style={chartSectionStyle}>
+          <h2
+            style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              marginBottom: '4px',
+            }}
+          >
+            Receita por Grupo de Procedimento (R$)
+          </h2>
+          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+            Valor faturado por grupo de procedimento no período.
+          </p>
 
-          <div className="w-full h-80">
+          <div style={chartContainerStyle}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={porGrupo}
@@ -441,7 +586,7 @@ export default function PainelImagemCorPage() {
                   }
                 />
                 <Legend />
-                <Bar dataKey="valor" fill="#a855f7" radius={[8, 8, 0, 0]}>
+                <Bar dataKey="valor" fill="#a855f7">
                   <LabelList
                     dataKey="valorFormatado"
                     position="top"
@@ -457,18 +602,22 @@ export default function PainelImagemCorPage() {
           </div>
         </section>
 
-        {/* GRÁFICO 3 – QUANTIDADE POR GRUPO */}
-        <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
-          <div>
-            <h2 className="text-lg md:text-xl font-semibold">
-              Quantidade de Atendimentos por Grupo
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Número de atendimentos realizados em cada grupo de procedimento.
-            </p>
-          </div>
+        {/* GRÁFICO 3 – Quantidade por Grupo */}
+        <section style={chartSectionStyle}>
+          <h2
+            style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              marginBottom: '4px',
+            }}
+          >
+            Quantidade de Atendimentos por Grupo
+          </h2>
+          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+            Número de atendimentos realizados em cada grupo de procedimento.
+          </p>
 
-          <div className="w-full h-80">
+          <div style={chartContainerStyle}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={porGrupo}
@@ -486,11 +635,7 @@ export default function PainelImagemCorPage() {
                 <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
                 <Tooltip />
                 <Legend />
-                <Bar
-                  dataKey="quantidade"
-                  fill="#22c55e"
-                  radius={[8, 8, 0, 0]}
-                >
+                <Bar dataKey="quantidade" fill="#22c55e">
                   <LabelList
                     dataKey="quantidade"
                     position="top"
@@ -506,7 +651,14 @@ export default function PainelImagemCorPage() {
           </div>
         </section>
 
-        <footer className="pb-8 text-center text-xs text-slate-500">
+        <footer
+          style={{
+            marginTop: '32px',
+            fontSize: '11px',
+            textAlign: 'center',
+            color: '#6b7280',
+          }}
+        >
           Dados integrados ao Biodata — ImagemCor • Painel em construção
         </footer>
       </div>
