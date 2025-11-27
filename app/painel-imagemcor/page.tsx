@@ -124,7 +124,7 @@ export default function PainelImagemCorPage() {
       const total = convData.reduce((acc, item) => acc + item.valor, 0);
       setTotalReceita(total);
 
-      // 2) Novos pacientes
+      // 2) Novos pacientes  ✅ AJUSTE AQUI (campo Unnamed1)
       const urlNovos =
         `${baseUrl}` +
         '?target_url=null' +
@@ -142,6 +142,8 @@ export default function PainelImagemCorPage() {
         npRow.Quantidade ??
         npRow.TOTAL ??
         npRow.PACIENTES ??
+        npRow.Unnamed1 ?? // <--- NOVO
+        npRow.UNNAMED1 ?? // <--- NOVO
         0;
       setNovosPacientes(parseGenericNumber(npValor));
 
@@ -167,7 +169,7 @@ export default function PainelImagemCorPage() {
       const tkValor = parseBRLToNumber(tkTexto);
       setTicketMedio(tkValor);
 
-      // 4) Faturamento por grupo de procedimento
+      // 4) Faturamento por grupo de procedimento  ✅ AJUSTE NO CAMPO Quant
       const urlGrupo =
         `${baseUrl}` +
         '?target_url=null' +
@@ -201,6 +203,8 @@ export default function PainelImagemCorPage() {
           const qtd =
             row.Qtd ??
             row.QTD ??
+            row.Quant ?? // <--- NOVO
+            row.QUANT ?? // <--- NOVO
             row.Quantidade ??
             row.QTDE ??
             row.ATENDIMENTOS ??
@@ -284,7 +288,7 @@ export default function PainelImagemCorPage() {
 
   const chartContainerStyle: React.CSSProperties = {
     width: '100%',
-    height: 320, // AQUI garantimos altura fixa (gráfico aparece)
+    height: 320,
   };
 
   return (
