@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   BarChart,
   Bar,
@@ -48,6 +49,20 @@ interface GrupoRow {
 }
 
 export default function PainelImagemCorPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const cliente = window.localStorage.getItem('painelCliente');
+      // só permite quem logou como painel "imagemcor"
+      if (cliente !== 'imagemcor') {
+        router.replace('/login');
+      }
+    } catch {
+      router.replace('/login');
+    }
+  }, [router]);
+  
   const hoje = new Date();
   const hojeISO = hoje.toISOString().slice(0, 10);
 
