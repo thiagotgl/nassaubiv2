@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useRouter } from 'next/navigation';
 
 // Converte "R$ 29.487,86" em número 29487.86
 function parseBRLToNumber(texto: string | null | undefined): number {
