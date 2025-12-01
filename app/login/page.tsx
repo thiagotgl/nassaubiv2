@@ -9,12 +9,12 @@ const CLIENTES = {
   dashboard: {
     label: 'Clínica — Faturamento geral',
     path: '/dashboard',
-    senha: 'adminclinica@321',      // <<< AJUSTE AQUI SE QUISER
+    senha: 'admin123',      // <<< AJUSTE AQUI SE QUISER
   },
   imagemcor: {
     label: 'ImagemCor — Painel Financeiro',
     path: '/painel-imagemcor',
-    senha: 'adminimagemcor@321',    // <<< AJUSTE AQUI SE QUISER
+    senha: 'admin123',    // <<< AJUSTE AQUI SE QUISER
   },
 } as const;
 
