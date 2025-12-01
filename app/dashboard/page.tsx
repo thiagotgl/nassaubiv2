@@ -26,6 +26,19 @@ function parseBRLToNumber(texto: string | null | undefined): number {
 }
 
 export default function Dashboard() {
+    const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const cliente = window.localStorage.getItem('painelCliente');
+      // só permite quem logou como painel "dashboard"
+      if (cliente !== 'dashboard') {
+        router.replace('/login');
+      }
+    } catch {
+      router.replace('/login');
+    }
+  }, [router]);
   const [hoje, setHoje] = useState<any>(null);
   const [mensal, setMensal] = useState<any[]>([]); // Faturamento
   const [mensalDespesas, setMensalDespesas] = useState<any[]>([]); // Despesas
