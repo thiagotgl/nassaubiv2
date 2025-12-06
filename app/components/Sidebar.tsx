@@ -11,16 +11,16 @@ export default function Sidebar() {
 
   const menuItems = [
     {
-      name: 'Painel ImagemCor',
-      href: '/painel-imagemcor',
-      icon: '📊',
-      description: 'Dashboard financeiro',
-    },
-    {
-      name: 'Dashboard',
+      name: 'Dashboard Operacional',
       href: '/dashboard',
       icon: '📈',
       description: 'Visão geral',
+    },
+    {
+      name: 'Painel Financeiro ImagemCor',
+      href: '/painel-imagemcor',
+      icon: '📊',
+      description: 'Painel Financeiro',
     },
   ];
 
@@ -158,7 +158,13 @@ export default function Sidebar() {
           <button
             onClick={() => {
               if (typeof window !== 'undefined') {
-                window.localStorage.removeItem('logado');
+                // limpa o armazenamento local e o cookie de autenticação
+                try {
+                  window.localStorage.removeItem('logado');
+                } catch {}
+                try {
+                  document.cookie = 'auth=; path=/; max-age=0';
+                } catch {}
                 router.push('/login');
               }
             }}

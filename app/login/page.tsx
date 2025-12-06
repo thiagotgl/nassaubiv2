@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,9 +19,20 @@ export default function LoginPage() {
 
     try {
       localStorage.setItem('logado', 'true');
+      // também grava um cookie simples que o middleware pode ler
+      try {
+        document.cookie = `auth=true; path=/; max-age=${60 * 60 * 24}`; // 1 dia
+      } catch (err) {}
     } catch {}
 
-    router.push('/menu');
+    // redireciona para a origem (se houver) ou para /menu
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from') || '/menu';
+      router.push(from);
+    } catch {
+      router.push('/menu');
+    }
   }
 
   return (
