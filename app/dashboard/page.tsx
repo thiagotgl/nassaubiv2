@@ -1,0 +1,210 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Sidebar from '../components/Sidebar';
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  LabelList,
+} from 'recharts';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { useRouter } from 'next/navigation';
+
+// Converte "R$ 29.487,86" em número 29487.86
+function parseBRLToNumber(texto: string | null | undefined): number {
+  if (!texto) return 0;
+  const limpo = texto.replace(/[^\d,.-]/g, '');
+  const normalizado = limpo.replace(/\./g, '').replace(',', '.');
+  const n = Number(normalizado);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export default function Dashboard() {
+  const router = useRouter();
+
+  // NOVA VERIFICAÇÃO: aceita quem tem 'logado' = true (nosso novo sistema)
+  useEffect(() => {
+    try {
+      const logado = window.localStorage.getItem('logado');
+      if (!logado) {
+        router.replace('/login');
+      }
+    } catch {
+      router.replace('/login');
+    }
+  }, [router]);
+
+  const [hoje, setHoje] = useState<any>(null);
+  const [mensal, setMensal] = useState<any[]>([]);
+  const [mensalDespesas, setMensalDespesas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const carregarTudo = async () => {
+      setLoading(true);
+
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const hojeRes = await fetch(`/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`);
+      const hojeData = await hojeRes.json();
+
+      const hoje = new Date();
+      const meses: { inicio: string; fim: string; nome: string }[] = [];
+
+      for (let i = 11; i >= 0; i--) {
+        const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        const inicio = data.toISOString().slice(0, 10);
+        const fimMes = new Date(data.getFullYear(), data.getMonth() + 1, 0);
+        const fim = fimMes.toISOString().slice(0, 10);
+        const nome = data
+          .toLocaleString('pt-BR', { month: 'short', year: 'numeric' })
+          .replace('.', '');
+        meses.push({ inicio, fim, nome });
+      }
+
+      const mensalData = await Promise.all(
+        meses.map(async ({ inicio, fim, nome }) => {
+          const res = await fetch(`/api/faturamento?inicio=${inicio}&fim=${fim}`);
+          const data = await res.json();
+          const valor = data.valor_bruto || 0;
+          return {
+            mes: nome,
+            valor,
+            valorFormatado: valor.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            }),
+          };
+        })
+      );
+
+      const mensalDespesasData = await Promise.all(
+        meses.map(async ({ inicio, fim, nome }) => {
+          const url =
+            'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico' +
+            '?target_url=null' +
+            '&procedure=spBITotalDespesas' +
+            '&parametros=%40DATAINICIO,%40DATAFIM,%40UNIDADE' +
+            `&valores=${inicio},${fim},_,` +
+            '&idSAC=544';
+
+          const res = await fetch(url);
+          const json = await res.json();
+          const texto = json?.[0]?.['R$'] ?? 'R$ 0,00';
+          const valor = parseBRLToNumber(texto);
+
+          return {
+            mes: nome,
+            valor,
+            valorFormatado: texto,
+          };
+        })
+      );
+
+      setHoje(hojeData);
+      setMensal(mensalData);
+      setMensalDespesas(mensalDespesasData);
+      setLoading(false);
+    };
+
+    carregarTudo();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <p className="text-6xl font-bold text-white animate-pulse">
+          Carregando PowerNassau BI...
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Sidebar />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+        <div style={{ maxWidth: '1120px', margin: '0 auto', padding: '32px 16px 40px' }} className="space-y-32">
+          <h1 className="text-7xl md:text-9xl font-black text-center bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-yellow-400 to-pink-500 drop-shadow-2xl">
+            FATURAMENTO TOTAL CLÍNICA
+          </h1>
+
+        {/* CARD DO DIA */}
+        <section className="text-center">
+          <div className="inline-block bg-white/10 backdrop-blur-3xl rounded-3xl p-20 shadow-2xl border border-white/30">
+            <p className="text-5xl font-bold mb-8">Faturamento Hoje</p>
+            <p className="text-9xl font-black text-green-400">
+              {hoje.faturamento}
+            </p>
+            <p className="text-3xl mt-10 opacity-80">
+              {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </p>
+          </div>
+        </section>
+
+        {/* GRÁFICO FATURAMENTO */}
+        <section>
+          <div className="text-center">
+            <h2 className="text-5xl font-bold mb-4">
+              Evolução Mensal — Últimos 12 Meses
+            </h2>
+            <p className="text-lg md:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed opacity-90">
+              Os valores exibidos referem-se ao faturamento efetivamente registrado. <strong>PDVs particulares</strong> aparecem somente após a efetivação e <strong>convênios</strong> após o recebimento do crédito.
+            </p>
+          </div>
+
+          <div className="mt-12 bg-slate-50 rounded-3xl p-12 shadow-2xl">
+            <ResponsiveContainer width="100%" height={500}>
+              <ComposedChart data={mensal} margin={{ top: 60, right: 40, left: 20, bottom: 40 }}>
+                <CartesianGrid stroke="#e5e7eb" strokeOpacity={0.4} vertical={false} />
+                <XAxis dataKey="mes" stroke="#6b7280" fontSize={14} tickMargin={12} />
+                <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+                <Bar dataKey="valor" barSize={45} radius={[6, 6, 0, 0]} fill="#1e3a8a">
+                  <LabelList dataKey="valorFormatado" position="top" offset={18} style={{ fill: '#1e3a8a', fontSize: 15, fontWeight: 700 }} />
+                </Bar>
+                <Line
+                  type="monotone"
+                  dataKey="valor"
+                  stroke="#60a5fa"
+                  strokeWidth={4}
+                  strokeDasharray="8 8"
+                  dot={{ r: 7, fill: '#1e3a8a', strokeWidth: 3, stroke: '#60a5fa' }}
+                  activeDot={{ r: 9 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        {/* GRÁFICO DESPESAS */}
+        <section>
+          <h2 className="text-5xl font-bold text-center mb-16">
+            Despesas Mensais — Últimos 12 Meses
+          </h2>
+          <div className="bg-orange-50 rounded-3xl p-12 shadow-2xl">
+            <ResponsiveContainer width="100%" height={500}>
+              <ComposedChart data={mensalDespesas} margin={{ top: 60, right: 40, left: 20, bottom: 40 }}>
+                <CartesianGrid stroke="#fed7aa" strokeOpacity={0.5} vertical={false} />
+                <XAxis dataKey="mes" stroke="#9a3412" fontSize={14} tickMargin={12} />
+                <YAxis stroke="#9a3412" fontSize={12} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+                <Bar dataKey="valor" barSize={45} radius={[6, 6, 0, 0]} fill="#ea580c">
+                  <LabelList dataKey="valorFormatado" position="top" offset={18} style={{ fill: '#9a3412', fontSize: 15, fontWeight: 700 }} />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        <footer className="text-center pb-20 text-xl opacity-70">
+          Dados 100% reais do Biodata — atualizado automaticamente
+        </footer>
+      </div>
+    </div>
+    </>
+  );
+}
