@@ -29,7 +29,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/dev/types/**/*.ts"
-  ],
+, "app/page.tsx.bak"  ],
   "exclude": [
     "node_modules"
   ]
