@@ -77,6 +77,10 @@ export default function PainelImagemCorPage() {
 
   const [porConvenio, setPorConvenio] = useState<ConvenioRow[]>([]);
   const [porGrupo, setPorGrupo] = useState<GrupoRow[]>([]);
+  const [consultaExame, setConsultaExame] = useState<any[]>([]);
+const [faturamentoPorDia, setFaturamentoPorDia] = useState<any[]>([]);
+  const [topProcedimentos, setTopProcedimentos] = useState<any[]>([]);
+const [ticketPorConvenio, setTicketPorConvenio] = useState<any[]>([]);
 
   const baseUrl =
     'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico';
@@ -86,128 +90,167 @@ export default function PainelImagemCorPage() {
       setLoading(true);
       setErro(null);
 
-      // 1) Receita por convênio
-      const urlConvenio =
-        `${baseUrl}?target_url=null&procedure=spBIFaturamentoPorConvenioValor&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional,%40UNIDADE&valores=${inicio},${fim},_,_,&idSAC=544`;
+ // NOVA CONSULTA - lista de atendimentos
+const url =
+`${baseUrl}?idSAC=544&procedure=usp_BI_FaturaAtendimento&parametros=%40DATAINICIO,%40DATAFIM&valores=${inicio},${fim}`;
 
-      const convRes = await fetch(urlConvenio);
-      const convJson = await convRes.json();
+const res = await fetch(url);
+const json = await res.json();
+const dados: any[] = Array.isArray(json) ? json : [];
+// AGRUPAR POR CONVÊNIO
+const mapaConvenio: Record<string, number> = {};
 
-      const convData: ConvenioRow[] = (convJson ?? []).map((row: any, idx: number) => {
-        const nome =
-          row.Convenio ||
-          row.CONVENIO ||
-          row.convenio ||
-          row.Nome ||
-          row.NOME ||
-          `Convênio ${idx + 1}`;
+const mapaGrupo: Record<string, { valor: number; quantidade: number }> = {};
+const mapaTipoEntrada: Record<string, number> = {};
+const mapaDia: Record<string, number> = {};
+const mapaProcedimento: Record<string, number> = {};
+const mapaTicketConvenio: Record<string, { valor: number; pacientes: Set<string> }> = {};
+const pacientes = new Set<string>();
 
-        const texto =
-          row['R$'] ??
-          row.valor_formatado ??
-          row.VALOR_FORMATADO ??
-          row.Valor ??
-          row.VALOR ??
-          'R$ 0,00';
+let total = 0;
 
-        const valor = parseBRLToNumber(texto);
+// LOOP ÚNICO
+dados.forEach((item: any) => {
 
-        return {
-          nome: String(nome),
-          valor,
-          valorFormatado:
-            typeof texto === 'string'
-              ? texto
-              : valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-        };
-      });
+  const valor = Number(item.numvalor || 0);
+  total += valor;
 
-      setPorConvenio(convData);
-      const total = convData.reduce((acc, item) => acc + item.valor, 0);
-      setTotalReceita(total);
+  // PACIENTES
+  if (item.strcliente) {
+    pacientes.add(item.strcliente);
+  }
 
-      // 2) Novos pacientes
-      const urlNovos =
-        `${baseUrl}?target_url=null&procedure=spBIPacientesCadastrados&parametros=%40DATAINICIO,%40DATAFIM,%40UNIDADE,%40CONVENIO,%40TIPOENTRADA&valores=${inicio},${fim},_,_,_,&idSAC=544`;
+  // CONVÊNIO
+  const convenio = item.strconvenio || "Sem convênio";
+  mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
-      const novosRes = await fetch(urlNovos);
-      const novosJson = await novosRes.json();
-      const npRow = novosJson?.[0] ?? {};
-      const npValor =
-        npRow.Qtd ??
-        npRow.QTD ??
-        npRow.Quantidade ??
-        npRow.TOTAL ??
-        npRow.PACIENTES ??
-        npRow.Unnamed1 ??
-        npRow.UNNAMED1 ??
-        0;
-      setNovosPacientes(parseGenericNumber(npValor));
+  // PROCEDIMENTO (TOP 10)
+const procedimento = item.strprocedimento || "Sem procedimento";
+mapaProcedimento[procedimento] =
+  (mapaProcedimento[procedimento] || 0) + valor;
 
-      // 3) Ticket médio
-      const urlTicket =
-        `${baseUrl}?target_url=null&procedure=spBITicketMedioCard&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional&valores=${inicio},${fim},_,&idSAC=544`;
 
-      const ticketRes = await fetch(urlTicket);
-      const ticketJson = await ticketRes.json();
-      const tkRow = ticketJson?.[0] ?? {};
-      const tkTexto =
-        tkRow['R$'] ??
-        tkRow.TicketMedio ??
-        tkRow.TICKETMEDIO ??
-        tkRow.Valor ??
-        tkRow.VALOR ??
-        'R$ 0,00';
-      const tkValor = parseBRLToNumber(tkTexto);
-      setTicketMedio(tkValor);
+// TICKET MÉDIO POR CONVÊNIO
+if (!mapaTicketConvenio[convenio]) {
+  mapaTicketConvenio[convenio] = {
+    valor: 0,
+    pacientes: new Set<string>()
+  };
+}
 
-      // 4) Faturamento por grupo
-      const urlGrupo =
-        `${baseUrl}?target_url=null&procedure=spBIFaturamentoPorGrupodeProcedimentoValor&parametros=%40DATAINICIO,%40DATAFIM,%40Profissional,%40UNIDADE,%40PROFISSIONAL&valores=${inicio},${fim},_,_,_,&idSAC=544`;
+mapaTicketConvenio[convenio].valor += valor;
 
-      const grupoRes = await fetch(urlGrupo);
-      const grupoJson = await grupoRes.json();
+if (item.strcliente) {
+  mapaTicketConvenio[convenio].pacientes.add(item.strcliente);
+}
 
-      const grpData: GrupoRow[] = (grupoJson ?? []).map((row: any, idx: number) => {
-        const nome =
-          row.Grupo ||
-          row.GRUPO ||
-          row.GrupoProcedimento ||
-          row.Grupo_Procedimento ||
-          row.Nome ||
-          `Grupo ${idx + 1}`;
+  // GRUPO
+  const grupo = item.strgrupoProcedimento || "Outros";
+  const qtd = Number(item.numquantidade || 1);
 
-        const texto =
-          row['R$'] ??
-          row.valor_formatado ??
-          row.VALOR_FORMATADO ??
-          row.Valor ??
-          row.VALOR ??
-          'R$ 0,00';
-        const valor = parseBRLToNumber(texto);
+  if (!mapaGrupo[grupo]) {
+    mapaGrupo[grupo] = { valor: 0, quantidade: 0 };
+  }
 
-        const qtd =
-          row.Qtd ??
-          row.QTD ??
-          row.Quant ??
-          row.QUANT ??
-          row.Quantidade ??
-          row.QTDE ??
-          row.ATENDIMENTOS ??
-          0;
+  mapaGrupo[grupo].valor += valor;
+  mapaGrupo[grupo].quantidade += qtd;
 
-        return {
-          nome: String(nome),
-          valor,
-          valorFormatado:
-            typeof texto === 'string'
-              ? texto
-              : valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-          quantidade: parseGenericNumber(qtd),
-        };
-      });
+  // CONSULTA VS EXAME
+  const tipo = item.strtipoentrada || "Outros";
+  mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
 
-      setPorGrupo(grpData);
+// FATURAMENTO POR DIA
+const data = item.datatende
+  ? new Date(item.datatende).toISOString().slice(0,10)
+  : "Sem data";
+
+mapaDia[data] = (mapaDia[data] || 0) + valor;
+
+});   // 👈 FECHA O LOOP AQUI
+// TOTAL
+setTotalReceita(total);
+
+// TICKET MÉDIO
+const ticket = pacientes.size > 0 ? total / pacientes.size : 0;
+setTicketMedio(ticket);
+
+// PACIENTES
+setNovosPacientes(pacientes.size);
+
+
+// CONVÊNIO
+const convData: ConvenioRow[] = Object.entries(mapaConvenio).map(([nome, valor]) => ({
+  nome,
+  valor,
+  valorFormatado: valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }),
+}));
+
+setPorConvenio(convData);
+
+
+// GRUPO
+const grpData: GrupoRow[] = Object.entries(mapaGrupo).map(([nome, obj]) => ({
+  nome,
+  valor: obj.valor,
+  quantidade: obj.quantidade,
+  valorFormatado: obj.valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }),
+}));
+
+setPorGrupo(grpData);
+
+
+// CONSULTA VS EXAME
+const tipoEntradaData = Object.entries(mapaTipoEntrada).map(([nome, valor]) => ({
+  nome,
+  valor
+}));
+
+setConsultaExame(tipoEntradaData);
+
+
+// FATURAMENTO POR DIA
+const faturamentoDiaData = Object.entries(mapaDia).map(([data, valor]) => ({
+  nome: data,
+  valor
+}));
+
+      faturamentoDiaData.sort(
+  (a,b)=>new Date(a.nome).getTime()-new Date(b.nome).getTime()
+);
+
+setFaturamentoPorDia(faturamentoDiaData);
+      // TOP 10 PROCEDIMENTOS
+const topProcedimentosData = Object.entries(mapaProcedimento)
+  .map(([nome, valor]) => ({
+    nome,
+    valor
+  }))
+  .sort((a, b) => b.valor - a.valor)
+  .slice(0, 10);
+
+setTopProcedimentos(topProcedimentosData);
+      // TICKET MÉDIO POR CONVÊNIO
+const ticketConvenioData = Object.entries(mapaTicketConvenio).map(([nome, obj]) => {
+
+  const ticket =
+    obj.pacientes.size > 0
+      ? obj.valor / obj.pacientes.size
+      : 0;
+
+  return {
+    nome,
+    valor: ticket
+  };
+});
+
+setTicketPorConvenio(ticketConvenioData);
+      
     } catch (e) {
       console.error(e);
       setErro('Erro ao carregar dados. Tente novamente mais tarde.');
@@ -463,6 +506,116 @@ export default function PainelImagemCorPage() {
             </ResponsiveContainer>
           </div>
         </section>
+
+        <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Consulta vs Exame
+  </h2>
+
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={consultaExame}>
+        <CartesianGrid strokeDasharray="3 3" />
+<XAxis dataKey="nome" />
+        <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#6366f1">   <LabelList     dataKey="valor"     position="top"     formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}   /> </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>
+
+      <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Faturamento por Dia
+  </h2>
+
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={faturamentoPorDia}>
+        <CartesianGrid strokeDasharray="3 3" />
+<XAxis
+  dataKey="nome"
+  interval="preserveStartEnd"
+  tickFormatter={(v)=>new Date(v).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+/>
+<YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#14b8a6">   <LabelList     dataKey="valor"     position="top"     formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}   /> </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>  
+
+        <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Top 10 Procedimentos (Faturamento)
+  </h2>
+
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={topProcedimentos}>
+        <CartesianGrid strokeDasharray="3 3" />
+
+<XAxis
+  dataKey="nome"
+  angle={-30}
+  textAnchor="end"
+  interval={0}
+  height={70}
+/>
+        
+        <YAxis tickFormatter={(v)=>`R$ ${(v/1000).toFixed(0)}k`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#ef4444">
+          <LabelList
+            dataKey="valor"
+            position="top"
+            formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+          />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>
+
+        <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Ticket Médio por Convênio
+  </h2>
+
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={ticketPorConvenio}>
+        <CartesianGrid strokeDasharray="3 3" />
+
+<XAxis
+  dataKey="nome"
+  angle={-30}
+  textAnchor="end"
+  interval={0}
+  height={70}
+/>
+        
+        <YAxis tickFormatter={(v)=>`R$ ${Number(v).toLocaleString('pt-BR')}`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#0ea5e9">
+          <LabelList
+            dataKey="valor"
+            position="top"
+            formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+          />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>
+
+        
 
         <footer style={{ marginTop: '32px', fontSize: '11px', textAlign: 'center', color: '#6b7280' }}>
           Dados integrados ao Biodata — ImagemCor • Painel em construção
