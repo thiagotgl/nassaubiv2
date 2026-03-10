@@ -57,7 +57,7 @@ export default function PainelImagemCorPage() {
   const [inicio, setInicio] = useState<string>(hojeISO);
   const [fim, setFim] = useState<string>(hojeISO);
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const [totalReceita, setTotalReceita] = useState<number>(0);
@@ -86,7 +86,7 @@ export default function PainelImagemCorPage() {
       const json = await res.json();
 
       if (!Array.isArray(json)) {
-        console.error('Formato inesperado', json);
+        console.error('API retornou formato inesperado', json);
         return;
       }
 
@@ -107,7 +107,28 @@ export default function PainelImagemCorPage() {
 
       let total = 0;
 
+      const dataInicio = new Date(inicio + 'T00:00:00');
+      const dataFim = new Date(fim + 'T23:59:59');
+
       dados.forEach((item: any) => {
+        if (!item.datatende) return;
+
+        const partes = String(item.datatende).split(' ');
+        const dataStr = partes[0] || '';
+        const partesData = dataStr.split('/');
+
+        if (partesData.length !== 3) return;
+
+        const [dia, mes, ano] = partesData;
+        const dataItem = new Date(`${ano}-${mes}-${dia}`);
+
+        if (
+          isNaN(dataItem.getTime()) ||
+          dataItem < dataInicio ||
+          dataItem > dataFim
+        )
+          return;
+
         const valor = parseGenericNumber(item.numvalor);
         total += valor;
 
@@ -117,7 +138,9 @@ export default function PainelImagemCorPage() {
         mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
         const procedimento =
-          item.strdescrprocedimento || item.strprocedimento || 'Procedimento';
+          item.strdescrprocedimento ||
+          item.strprocedimento ||
+          'Sem procedimento';
 
         mapaProcedimento[procedimento] =
           (mapaProcedimento[procedimento] || 0) + valor;
@@ -135,30 +158,26 @@ export default function PainelImagemCorPage() {
           mapaTicketConvenio[convenio].pacientes.add(item.strcliente);
 
         const grupo = item.strgrupoProcedimento || 'Outros';
+        const qtd = Number(item.numquantidade || 1);
 
-        if (!mapaGrupo[grupo]) {
+        if (!mapaGrupo[grupo])
           mapaGrupo[grupo] = { valor: 0, quantidade: 0 };
-        }
 
         mapaGrupo[grupo].valor += valor;
-        mapaGrupo[grupo].quantidade += Number(item.numquantidade || 1);
+        mapaGrupo[grupo].quantidade += qtd;
 
         const tipo = item.strtipoentrada || 'Outros';
         mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
 
-        if (item.datatende) {
-          const partes = item.datatende.split(' ')[0].split('/');
-          if (partes.length === 3) {
-            const [d, m, a] = partes;
-            const dataISO = `${a}-${m}-${d}`;
-            mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valor;
-          }
-        }
+        const dataISO = dataItem.toISOString().slice(0, 10);
+        mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valor;
       });
 
       setTotalReceita(total);
       setNovosPacientes(pacientes.size);
-      setTicketMedio(total / (pacientes.size || 1));
+
+      const ticket = pacientes.size > 0 ? total / pacientes.size : 0;
+      setTicketMedio(ticket);
 
       setPorConvenio(
         Object.entries(mapaConvenio).map(([nome, valor]) => ({
@@ -192,8 +211,11 @@ export default function PainelImagemCorPage() {
 
       setFaturamentoPorDia(
         Object.entries(mapaDia)
-          .map(([nome, valor]) => ({ nome, valor }))
-          .sort((a, b) => (a.nome > b.nome ? 1 : -1))
+          .map(([data, valor]) => ({
+            nome: data,
+            valor,
+          }))
+          .sort((a, b) => new Date(a.nome).getTime() - new Date(b.nome).getTime())
       );
 
       setTopProcedimentos(
@@ -206,12 +228,15 @@ export default function PainelImagemCorPage() {
       setTicketPorConvenio(
         Object.entries(mapaTicketConvenio).map(([nome, obj]) => ({
           nome,
-          valor: obj.valor / (obj.pacientes.size || 1),
+          valor:
+            obj.pacientes.size > 0
+              ? obj.valor / obj.pacientes.size
+              : 0,
         }))
       );
     } catch (e) {
       console.error(e);
-      setErro('Erro ao carregar dados');
+      setErro('Erro ao carregar dados.');
     } finally {
       setLoading(false);
     }
@@ -221,112 +246,120 @@ export default function PainelImagemCorPage() {
     carregarDados();
   }, []);
 
-  if (loading) {
-    return (
-      <>
-        <Sidebar />
-        <div
-          style={{
-            height: '100vh',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            fontSize: 18,
-          }}
-        >
-          Carregando painel...
-        </div>
-      </>
-    );
-  }
+  const totalReceitaFormatado = totalReceita.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
 
-  const chartStyle = { width: '100%', height: 320 };
+  const ticketMedioFormatado = ticketMedio.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
 
   return (
     <>
       <Sidebar />
-      <div style={{ padding: 30 }}>
 
+      <div style={{ maxWidth: 1120, margin: '0 auto', padding: 20 }}>
         <h1>Painel Financeiro — ImagemCor</h1>
 
-        <div style={chartStyle}>
-          <ResponsiveContainer>
+        <section>
+          <h2>Receita por Convênio</h2>
+
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={porConvenio}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="nome" />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="valor" fill="#fb923c" />
+
+              <Bar dataKey="valor" fill="#fb923c">
+                <LabelList dataKey="valorFormatado" position="top" />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </section>
 
-        <div style={chartStyle}>
-          <ResponsiveContainer>
+        <section>
+          <h2>Receita por Grupo</h2>
+
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={porGrupo}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="nome" />
               <YAxis />
               <Tooltip />
               <Legend />
+
               <Bar dataKey="valor" fill="#a855f7" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </section>
 
-        <div style={chartStyle}>
-          <ResponsiveContainer>
+        <section>
+          <h2>Consulta vs Exame</h2>
+
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={consultaExame}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="nome" />
               <YAxis />
               <Tooltip />
               <Legend />
+
               <Bar dataKey="valor" fill="#6366f1" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </section>
 
-        <div style={chartStyle}>
-          <ResponsiveContainer>
+        <section>
+          <h2>Faturamento por Dia</h2>
+
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={faturamentoPorDia}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="nome" />
               <YAxis />
               <Tooltip />
               <Legend />
+
               <Bar dataKey="valor" fill="#14b8a6" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </section>
 
-        <div style={chartStyle}>
-          <ResponsiveContainer>
+        <section>
+          <h2>Top Procedimentos</h2>
+
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={topProcedimentos}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="nome" />
               <YAxis />
               <Tooltip />
               <Legend />
+
               <Bar dataKey="valor" fill="#ef4444" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </section>
 
-        <div style={chartStyle}>
-          <ResponsiveContainer>
+        <section>
+          <h2>Ticket Médio por Convênio</h2>
+
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={ticketPorConvenio}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="nome" />
               <YAxis />
               <Tooltip />
               <Legend />
+
               <Bar dataKey="valor" fill="#0ea5e9" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-
+        </section>
       </div>
     </>
   );
