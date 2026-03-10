@@ -128,7 +128,14 @@ dados.forEach((item: any) => {
 
    const valor = Number(item.numvalor || 0);
   total += valor;
+// PACIENTES
+if (item.strcliente) {
+  pacientes.add(item.strcliente);
+}
 
+// CONVÊNIO
+const convenio = item.strconvenio || "Sem convênio";
+mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
   // CONVÊNIO
   const convenio = item.strconvenio || "Sem convênio";
