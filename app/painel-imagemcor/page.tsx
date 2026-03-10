@@ -125,8 +125,7 @@ dados.forEach((item: any) => {
   ) {
     return;
   }
-
-   const valor = Number(item.numvalor || 0);
+const valor = parseGenericNumber(item.numvalor);
   total += valor;
 // PACIENTES
 if (item.strcliente) {
@@ -545,7 +544,7 @@ setTicketPorConvenio(ticketConvenioData);
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={consultaExame}>
         <CartesianGrid strokeDasharray="3 3" />
-<XAxis dataKey="nome" />
+<XAxis dataKey="nome" interval={0} />
         <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
         <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
         <Legend />
