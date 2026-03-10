@@ -160,9 +160,15 @@ if (item.strcliente) {
   mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
 
 // FATURAMENTO POR DIA
-const data = item.datatende
-  ? new Date(item.datatende).toISOString().slice(0,10)
-  : "Sem data";
+let data = "Sem data";
+
+if (item.datatende) {
+  const d = new Date(item.datatende);
+
+  if (!isNaN(d.getTime())) {
+    data = d.toISOString().slice(0,10);
+  }
+}
 
 mapaDia[data] = (mapaDia[data] || 0) + valor;
 
