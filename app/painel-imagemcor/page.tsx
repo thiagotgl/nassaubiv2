@@ -109,14 +109,29 @@ const pacientes = new Set<string>();
 
 let total = 0;
 
+      const dataInicio = new Date(inicio + "T00:00:00");
+const dataFim = new Date(fim + "T23:59:59");
+
 // LOOP ÚNICO
-dados.forEach((item: any) => {
 
- if (!item.datatende) return;
+      dados.forEach((item: any) => {
 
-  const dataItem = new Date(item.datatende);
-  const dataInicio = new Date(inicio);
-  const dataFim = new Date(fim);
+  if (!item.datatende) return;
+
+  const partes = String(item.datatende).split(" ");
+  const dataStr = partes[0] || "";
+
+
+const partesData = dataStr.split("/");
+
+if (partesData.length !== 3) return;
+
+const [dia, mes, ano] = partesData;
+
+        
+  const dataItem = new Date(`${ano}-${mes}-${dia}`);
+
+
 
   if (
     isNaN(dataItem.getTime()) ||
@@ -125,37 +140,37 @@ dados.forEach((item: any) => {
   ) {
     return;
   }
-const valor = parseGenericNumber(item.numvalor);
+
+  const valor = parseGenericNumber(item.numvalor);
   total += valor;
-// PACIENTES
-if (item.strcliente) {
-  pacientes.add(item.strcliente);
-}
 
-// CONVÊNIO
-const convenio = item.strconvenio || "Sem convênio";
-mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
+  // PACIENTES
+  if (item.strcliente) {
+    pacientes.add(item.strcliente);
+  }
 
+  // CONVÊNIO
+  const convenio = item.strconvenio || "Sem convênio";
+  mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
-  // PROCEDIMENTO (TOP 10)
-const procedimento = item.strprocedimento || "Sem procedimento";
-mapaProcedimento[procedimento] =
-  (mapaProcedimento[procedimento] || 0) + valor;
+  // PROCEDIMENTO
+  const procedimento = item.strprocedimento || "Sem procedimento";
+  mapaProcedimento[procedimento] =
+    (mapaProcedimento[procedimento] || 0) + valor;
 
+  // TICKET MÉDIO CONVÊNIO
+  if (!mapaTicketConvenio[convenio]) {
+    mapaTicketConvenio[convenio] = {
+      valor: 0,
+      pacientes: new Set<string>()
+    };
+  }
 
-// TICKET MÉDIO POR CONVÊNIO
-if (!mapaTicketConvenio[convenio]) {
-  mapaTicketConvenio[convenio] = {
-    valor: 0,
-    pacientes: new Set<string>()
-  };
-}
+  mapaTicketConvenio[convenio].valor += valor;
 
-mapaTicketConvenio[convenio].valor += valor;
-
-if (item.strcliente) {
-  mapaTicketConvenio[convenio].pacientes.add(item.strcliente);
-}
+  if (item.strcliente) {
+    mapaTicketConvenio[convenio].pacientes.add(item.strcliente);
+  }
 
   // GRUPO
   const grupo = item.strgrupoProcedimento || "Outros";
@@ -172,21 +187,14 @@ if (item.strcliente) {
   const tipo = item.strtipoentrada || "Outros";
   mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
 
-// FATURAMENTO POR DIA
-let data = "Sem data";
+  // FATURAMENTO POR DIA
+  const dataISO = dataItem.toISOString().slice(0,10);
+  mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valor;
 
-if (item.datatende) {
-  const d = new Date(item.datatende);
-
-  if (!isNaN(d.getTime())) {
-    data = d.toISOString().slice(0,10);
-  }
-}
-
-mapaDia[data] = (mapaDia[data] || 0) + valor;
-
-});   // 👈 FECHA O LOOP AQUI
-// TOTAL
+});
+      
+      
+      // TOTAL
 setTotalReceita(total);
 
 // TICKET MÉDIO
