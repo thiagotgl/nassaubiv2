@@ -221,10 +221,16 @@ setConsultaExame(tipoEntradaData);
 
 
 // FATURAMENTO POR DIA
-const faturamentoDiaData = Object.entries(mapaDia).map(([data, valor]) => ({
-  nome: data,
-  valor
-}));
+const faturamentoDiaData = Object.entries(mapaDia)
+  .map(([data, valor]) => {
+    const d = new Date(data);
+
+    return {
+      nome: !isNaN(d.getTime()) ? d.toISOString().slice(0,10) : "Sem data",
+      valor: Number.isFinite(valor) ? valor : 0
+    };
+  })
+  .filter(item => item.nome !== "Sem data");
 
       faturamentoDiaData.sort(
   (a,b)=>new Date(a.nome).getTime()-new Date(b.nome).getTime()
