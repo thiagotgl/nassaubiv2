@@ -112,12 +112,18 @@ let total = 0;
 // LOOP ÚNICO
 dados.forEach((item: any) => {
 
-  const valor = Number(item.numvalor || 0);
-  total += valor;
+ if (!item.datatende) return;
 
-  // PACIENTES
-  if (item.strcliente) {
-    pacientes.add(item.strcliente);
+  const dataItem = new Date(item.datatende);
+  const dataInicio = new Date(inicio);
+  const dataFim = new Date(fim);
+
+  if (
+    isNaN(dataItem.getTime()) ||
+    dataItem < dataInicio ||
+    dataItem > dataFim
+  ) {
+    return;
   }
 
   // CONVÊNIO
