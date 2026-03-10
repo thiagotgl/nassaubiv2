@@ -136,9 +136,6 @@ if (item.strcliente) {
 const convenio = item.strconvenio || "Sem convênio";
 mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
-  // CONVÊNIO
-  const convenio = item.strconvenio || "Sem convênio";
-  mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
   // PROCEDIMENTO (TOP 10)
 const procedimento = item.strprocedimento || "Sem procedimento";
@@ -548,7 +545,11 @@ setTicketPorConvenio(ticketConvenioData);
         <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
         <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
         <Legend />
-        <Bar dataKey="valor" fill="#6366f1">   <LabelList     dataKey="valor"     position="top"     formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}   /> </Bar>
+        <Bar dataKey="valor" fill="#6366f1">   <LabelList     dataKey="valor"     position="top"    formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}  /> </Bar>
       </BarChart>
     </ResponsiveContainer>
   </div>
@@ -576,7 +577,11 @@ setTicketPorConvenio(ticketConvenioData);
 <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
         <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
         <Legend />
-        <Bar dataKey="valor" fill="#14b8a6">   <LabelList     dataKey="valor"     position="top"     formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}   /> </Bar>
+        <Bar dataKey="valor" fill="#14b8a6">   <LabelList     dataKey="valor"     position="top"     formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}  /> </Bar>
       </BarChart>
     </ResponsiveContainer>
   </div>
@@ -607,7 +612,11 @@ setTicketPorConvenio(ticketConvenioData);
           <LabelList
             dataKey="valor"
             position="top"
-            formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+         formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}
           />
         </Bar>
       </BarChart>
@@ -640,7 +649,11 @@ setTicketPorConvenio(ticketConvenioData);
           <LabelList
             dataKey="valor"
             position="top"
-            formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}
           />
         </Bar>
       </BarChart>
