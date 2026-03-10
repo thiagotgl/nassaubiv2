@@ -17,6 +17,14 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Converte "R$ 29.487,86" em número 29487.86
+function parseBRLToNumber(texto: string | null | undefined): number {
+  if (!texto) return 0;
+  const limpo = texto.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(limpo);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function parseGenericNumber(v: any): number {
   if (v == null) return 0;
   if (typeof v === 'number') return v;
@@ -42,10 +50,13 @@ interface GrupoRow {
 export default function PainelImagemCorPage() {
   const router = useRouter();
 
+  // NOVA VERIFICAÇÃO — aceita quem tem 'logado' = true
   useEffect(() => {
     try {
       const logado = window.localStorage.getItem('logado');
-      if (!logado) router.replace('/login');
+      if (!logado) {
+        router.replace('/login');
+      }
     } catch {
       router.replace('/login');
     }
@@ -67,9 +78,9 @@ export default function PainelImagemCorPage() {
   const [porConvenio, setPorConvenio] = useState<ConvenioRow[]>([]);
   const [porGrupo, setPorGrupo] = useState<GrupoRow[]>([]);
   const [consultaExame, setConsultaExame] = useState<any[]>([]);
-  const [faturamentoPorDia, setFaturamentoPorDia] = useState<any[]>([]);
+const [faturamentoPorDia, setFaturamentoPorDia] = useState<any[]>([]);
   const [topProcedimentos, setTopProcedimentos] = useState<any[]>([]);
-  const [ticketPorConvenio, setTicketPorConvenio] = useState<any[]>([]);
+const [ticketPorConvenio, setTicketPorConvenio] = useState<any[]>([]);
 
   const baseUrl =
     'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico';
@@ -79,164 +90,216 @@ export default function PainelImagemCorPage() {
       setLoading(true);
       setErro(null);
 
-      const url =
-        `${baseUrl}?idSAC=544&procedure=usp_BI_FaturaAtendimento&parametros=%40DATAINICIO,%40DATAFIM&valores=${inicio},${fim}`;
+ // NOVA CONSULTA - lista de atendimentos
+const url =
+`${baseUrl}?idSAC=544&procedure=usp_BI_FaturaAtendimento&parametros=%40DATAINICIO,%40DATAFIM&valores=${inicio},${fim}`;
 
-      const res = await fetch(url);
-      const json = await res.json();
+const res = await fetch(url);
 
-      if (!Array.isArray(json)) {
-        console.error('API retornou formato inesperado', json);
-        return;
-      }
+const json = await res.json();
 
-      const dados = json;
+if (!Array.isArray(json)) {
+  console.error("API retornou formato inesperado", json);
+  return;
+}
+      
+const dados = json;
+      console.log("TOTAL REGISTROS API:", dados.length);
+console.log("PRIMEIRO REGISTRO:", dados[0]);
 
-      const mapaConvenio: Record<string, number> = {};
-      const mapaGrupo: Record<string, { valor: number; quantidade: number }> =
-        {};
-      const mapaTipoEntrada: Record<string, number> = {};
-      const mapaDia: Record<string, number> = {};
-      const mapaProcedimento: Record<string, number> = {};
-      const mapaTicketConvenio: Record<
-        string,
-        { valor: number; pacientes: Set<string> }
-      > = {};
+      
+// AGRUPAR POR CONVÊNIO
+const mapaConvenio: Record<string, number> = {};
 
-      const pacientes = new Set<string>();
+const mapaGrupo: Record<string, { valor: number; quantidade: number }> = {};
+const mapaTipoEntrada: Record<string, number> = {};
+const mapaDia: Record<string, number> = {};
+const mapaProcedimento: Record<string, number> = {};
+const mapaTicketConvenio: Record<string, { valor: number; pacientes: Set<string> }> = {};
+const pacientes = new Set<string>();
 
-      let total = 0;
+let total = 0;
 
-      const dataInicio = new Date(inicio + 'T00:00:00');
-      const dataFim = new Date(fim + 'T23:59:59');
+      const dataInicio = new Date(inicio + "T00:00:00");
+const dataFim = new Date(fim + "T23:59:59");
+
+// LOOP ÚNICO
 
       dados.forEach((item: any) => {
-        if (!item.datatende) return;
 
-        const partes = String(item.datatende).split(' ');
-        const dataStr = partes[0] || '';
-        const partesData = dataStr.split('/');
+  if (!item.datatende) return;
 
-        if (partesData.length !== 3) return;
+  const partes = String(item.datatende).split(" ");
+  const dataStr = partes[0] || "";
 
-        const [dia, mes, ano] = partesData;
-        const dataItem = new Date(`${ano}-${mes}-${dia}`);
 
-        if (
-          isNaN(dataItem.getTime()) ||
-          dataItem < dataInicio ||
-          dataItem > dataFim
-        )
-          return;
+const partesData = dataStr.split("/");
 
-        const valor = parseGenericNumber(item.numvalor);
-        total += valor;
+if (partesData.length !== 3) return;
 
-        if (item.strcliente) pacientes.add(item.strcliente);
+const [dia, mes, ano] = partesData;
 
-        const convenio = item.strconvenio?.trim() || 'Sem convênio';
-        mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
+        
+  const dataItem = new Date(`${ano}-${mes}-${dia}`);
 
-        const procedimento =
-          item.strdescrprocedimento ||
-          item.strprocedimento ||
-          'Sem procedimento';
 
-        mapaProcedimento[procedimento] =
-          (mapaProcedimento[procedimento] || 0) + valor;
+// if (
+//   isNaN(dataItem.getTime()) ||
+//   dataItem < dataInicio ||
+//   dataItem > dataFim
+// ) {
+//   return;
+// }
 
-        if (!mapaTicketConvenio[convenio]) {
-          mapaTicketConvenio[convenio] = {
-            valor: 0,
-            pacientes: new Set<string>(),
-          };
-        }
+  const valor = parseGenericNumber(item.numvalor);
+  total += valor;
 
-        mapaTicketConvenio[convenio].valor += valor;
+  // PACIENTES
+  if (item.strcliente) {
+    pacientes.add(item.strcliente);
+  }
 
-        if (item.strcliente)
-          mapaTicketConvenio[convenio].pacientes.add(item.strcliente);
+  // CONVÊNIO
+  const convenio = item.strconvenio?.trim() || "Sem convênio";
+  mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
-        const grupo = item.strgrupoProcedimento || 'Outros';
-        const qtd = Number(item.numquantidade || 1);
+  // PROCEDIMENTO
+ const procedimento =
+  item.strdescrprocedimento ||
+  item.strprocedimento ||
+  "Sem procedimento";
+  mapaProcedimento[procedimento] =
+    (mapaProcedimento[procedimento] || 0) + valor;
 
-        if (!mapaGrupo[grupo])
-          mapaGrupo[grupo] = { valor: 0, quantidade: 0 };
+  // TICKET MÉDIO CONVÊNIO
+  if (!mapaTicketConvenio[convenio]) {
+    mapaTicketConvenio[convenio] = {
+      valor: 0,
+      pacientes: new Set<string>()
+    };
+  }
 
-        mapaGrupo[grupo].valor += valor;
-        mapaGrupo[grupo].quantidade += qtd;
+  mapaTicketConvenio[convenio].valor += valor;
 
-        const tipo = item.strtipoentrada || 'Outros';
-        mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
+  if (item.strcliente) {
+    mapaTicketConvenio[convenio].pacientes.add(item.strcliente);
+  }
 
-        const dataISO = dataItem.toISOString().slice(0, 10);
-        mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valor;
-      });
+  // GRUPO
+  const grupo = item.strgrupoProcedimento || "Outros";
+  const qtd = Number(item.numquantidade || 1);
 
-      setTotalReceita(total);
-      setNovosPacientes(pacientes.size);
+  if (!mapaGrupo[grupo]) {
+    mapaGrupo[grupo] = { valor: 0, quantidade: 0 };
+  }
 
-      const ticket = pacientes.size > 0 ? total / pacientes.size : 0;
-      setTicketMedio(ticket);
+  mapaGrupo[grupo].valor += valor;
+  mapaGrupo[grupo].quantidade += qtd;
 
-      setPorConvenio(
-        Object.entries(mapaConvenio).map(([nome, valor]) => ({
-          nome,
-          valor,
-          valorFormatado: valor.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-          }),
-        }))
-      );
+  // CONSULTA VS EXAME
+  const tipo = item.strtipoentrada || "Outros";
+  mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
 
-      setPorGrupo(
-        Object.entries(mapaGrupo).map(([nome, obj]) => ({
-          nome,
-          valor: obj.valor,
-          quantidade: obj.quantidade,
-          valorFormatado: obj.valor.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-          }),
-        }))
-      );
+  // FATURAMENTO POR DIA
+  const dataISO = dataItem.toISOString().slice(0,10);
+  mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valor;
 
-      setConsultaExame(
-        Object.entries(mapaTipoEntrada).map(([nome, valor]) => ({
-          nome,
-          valor,
-        }))
-      );
+});
+      
+      
+      // TOTAL
+setTotalReceita(total);
 
-      setFaturamentoPorDia(
-        Object.entries(mapaDia)
-          .map(([data, valor]) => ({
-            nome: data,
-            valor,
-          }))
-          .sort((a, b) => new Date(a.nome).getTime() - new Date(b.nome).getTime())
-      );
+// TICKET MÉDIO
+const ticket = pacientes.size > 0 ? total / pacientes.size : 0;
+setTicketMedio(ticket);
 
-      setTopProcedimentos(
-        Object.entries(mapaProcedimento)
-          .map(([nome, valor]) => ({ nome, valor }))
-          .sort((a, b) => b.valor - a.valor)
-          .slice(0, 10)
-      );
+// PACIENTES
+setNovosPacientes(pacientes.size);
 
-      setTicketPorConvenio(
-        Object.entries(mapaTicketConvenio).map(([nome, obj]) => ({
-          nome,
-          valor:
-            obj.pacientes.size > 0
-              ? obj.valor / obj.pacientes.size
-              : 0,
-        }))
-      );
+
+// CONVÊNIO
+const convData: ConvenioRow[] = Object.entries(mapaConvenio).map(([nome, valor]) => ({
+  nome,
+  valor,
+  valorFormatado: valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }),
+}));
+
+setPorConvenio(convData);
+
+
+// GRUPO
+const grpData: GrupoRow[] = Object.entries(mapaGrupo).map(([nome, obj]) => ({
+  nome,
+  valor: obj.valor,
+  quantidade: obj.quantidade,
+  valorFormatado: obj.valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }),
+}));
+
+setPorGrupo(grpData);
+
+
+// CONSULTA VS EXAME
+const tipoEntradaData = Object.entries(mapaTipoEntrada).map(([nome, valor]) => ({
+  nome,
+  valor
+}));
+
+setConsultaExame(tipoEntradaData);
+
+
+// FATURAMENTO POR DIA
+const faturamentoDiaData = Object.entries(mapaDia)
+  .map(([data, valor]) => {
+    const d = new Date(data);
+
+    return {
+      nome: !isNaN(d.getTime()) ? d.toISOString().slice(0,10) : "Sem data",
+      valor: Number.isFinite(valor) ? valor : 0
+    };
+  })
+  .filter(item => item.nome !== "Sem data");
+
+      faturamentoDiaData.sort(
+  (a,b)=>new Date(a.nome).getTime()-new Date(b.nome).getTime()
+);
+
+setFaturamentoPorDia(faturamentoDiaData);
+      // TOP 10 PROCEDIMENTOS
+const topProcedimentosData = Object.entries(mapaProcedimento)
+  .map(([nome, valor]) => ({
+    nome,
+    valor
+  }))
+  .sort((a, b) => b.valor - a.valor)
+  .slice(0, 10);
+
+setTopProcedimentos(topProcedimentosData);
+      // TICKET MÉDIO POR CONVÊNIO
+const ticketConvenioData = Object.entries(mapaTicketConvenio).map(([nome, obj]) => {
+
+  const ticket =
+    obj.pacientes.size > 0
+      ? obj.valor / obj.pacientes.size
+      : 0;
+
+  return {
+    nome,
+    valor: ticket
+  };
+});
+
+setTicketPorConvenio(ticketConvenioData);
+      
     } catch (e) {
       console.error(e);
-      setErro('Erro ao carregar dados.');
+      setErro('Erro ao carregar dados. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
@@ -250,117 +313,414 @@ export default function PainelImagemCorPage() {
     style: 'currency',
     currency: 'BRL',
   });
-
   const ticketMedioFormatado = ticketMedio.toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   });
 
+  // Estilos (mantive exatamente como você já tinha)
+  const containerStyle: React.CSSProperties = {
+    minHeight: '100vh',
+    backgroundColor: '#f3f4f6',
+    color: '#020617',
+    fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, -system-ui, sans-serif',
+  };
+
+  const wrapperStyle: React.CSSProperties = {
+    maxWidth: '1120px',
+    margin: '0 auto',
+    padding: '32px 16px 40px',
+  };
+
+  const cardGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '16px',
+  };
+
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '16px 20px',
+    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
+    border: '1px solid #e5e7eb',
+  };
+
+  const chartSectionStyle: React.CSSProperties = {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '16px 20px',
+    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
+    border: '1px solid #e5e7eb',
+    marginTop: '24px',
+  };
+
+  const chartContainerStyle: React.CSSProperties = {
+    width: '100%',
+    height: 320,
+  };
+
   return (
     <>
       <Sidebar />
+      <div style={containerStyle}>
+      <div style={wrapperStyle}>
+        <header style={{ marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '8px' }}>
+            Painel Financeiro — ImagemCor
+          </h1>
+          <p style={{ fontSize: '14px', color: '#4b5563' }}>
+            Período:{' '}
+            <strong>
+              {format(new Date(inicio), 'dd/MM/yyyy', { locale: ptBR })} até{' '}
+              {format(new Date(fim), 'dd/MM/yyyy', { locale: ptBR })}
+            </strong>
+          </p>
 
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: 20 }}>
-        <h1>Painel Financeiro — ImagemCor</h1>
+          {/* FILTROS */}
+          <div
+            style={{
+              marginTop: '16px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-end',
+              gap: '12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: '12px', color: '#6b7280' }}>Data inicial</label>
+              <input
+                type="date"
+                value={inicio}
+                onChange={(e) => setInicio(e.target.value)}
+                style={{
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  padding: '4px 8px',
+                  fontSize: '13px',
+                }}
+              />
+            </div>
 
-        <section>
-          <h2>Receita por Convênio</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: '12px', color: '#6b7280' }}>Data final</label>
+              <input
+                type="date"
+                value={fim}
+                onChange={(e) => setFim(e.target.value)}
+                style={{
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  padding: '4px 8px',
+                  fontSize: '13px',
+                }}
+              />
+            </div>
 
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={porConvenio}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
+            <button
+              type="button"
+              onClick={carregarDados}
+              disabled={loading}
+              style={{
+                marginTop: '18px',
+                backgroundColor: loading ? '#9ca3af' : '#10b981',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: loading ? 'default' : 'pointer',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                border: 'none',
+              }}
+            >
+              {loading ? 'Atualizando...' : 'Atualizar dados'}
+            </button>
 
-              <Bar dataKey="valor" fill="#fb923c">
-                <LabelList dataKey="valorFormatado" position="top" />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+            {erro && <span style={{ fontSize: '12px', color: '#dc2626' }}>{erro}</span>}
+          </div>
+        </header>
+
+        {/* CARDS KPIs */}
+        <section style={cardGridStyle}>
+          <div style={cardStyle}>
+            <p style={{ fontSize: '11px', textTransform: 'uppercase', color: '#6b7280', letterSpacing: '0.06em' }}>
+              Volume de atendimento (R$)
+            </p>
+            <p style={{ marginTop: '8px', fontSize: '22px', fontWeight: 900, color: '#047857' }}>
+              {totalReceitaFormatado}
+            </p>
+            <p style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+              Soma da receita por convênio no período selecionado.
+            </p>
+          </div>
+
+          <div style={cardStyle}>
+            <p style={{ fontSize: '11px', textTransform: 'uppercase', color: '#6b7280', letterSpacing: '0.06em' }}>
+              Novos pacientes
+            </p>
+            <p style={{ marginTop: '8px', fontSize: '22px', fontWeight: 900, color: '#0ea5e9' }}>
+              {novosPacientes.toLocaleString('pt-BR')}
+            </p>
+            <p style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+              Pacientes cadastrados no período.
+            </p>
+          </div>
+
+          <div style={cardStyle}>
+            <p style={{ fontSize: '11px', textTransform: 'uppercase', color: '#6b7280', letterSpacing: '0.06em' }}>
+              Ticket médio
+            </p>
+            <p style={{ marginTop: '8px', fontSize: '22px', fontWeight: 900, color: '#d97706' }}>
+              {ticketMedioFormatado}
+            </p>
+            <p style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+              Valor médio por atendimento no período.
+            </p>
+          </div>
         </section>
 
-        <section>
-          <h2>Receita por Grupo</h2>
+        {/* GRÁFICOS */}
+        <section style={chartSectionStyle}>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '4px' }}>
+            Receita por Convênio (R$)
+          </h2>
+          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+            Comparação do faturamento por convênio no período selecionado.
+          </p>
+          <div style={chartContainerStyle}>
 
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={porGrupo}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
+<ResponsiveContainer width="100%" height="100%">
+  <BarChart data={porConvenio} margin={{ top: 20, right: 20, left: 0, bottom: 40 }}>
+    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
 
-              <Bar dataKey="valor" fill="#a855f7" />
-            </BarChart>
-          </ResponsiveContainer>
+    <XAxis
+      dataKey="nome"
+      angle={-30}
+      textAnchor="end"
+      interval={0}
+      height={60}
+      tick={{ fill: '#6b7280', fontSize: 11 }}
+    />
+
+    <YAxis
+      tick={{ fill: '#6b7280', fontSize: 11 }}
+      tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
+    />
+
+    <Tooltip
+      formatter={(v: any) =>
+        Number(v).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        })
+      }
+    />
+
+    <Legend />
+
+    <Bar dataKey="valor" fill="#fb923c">
+      <LabelList
+        dataKey="valorFormatado"
+        position="top"
+        style={{ fontSize: 11, fill: '#92400e', fontWeight: 600 }}
+      />
+    </Bar>
+  </BarChart>
+</ResponsiveContainer>
+
+            
+          </div>
         </section>
 
-        <section>
-          <h2>Consulta vs Exame</h2>
-
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={consultaExame}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-
-              <Bar dataKey="valor" fill="#6366f1" />
-            </BarChart>
-          </ResponsiveContainer>
+        <section style={chartSectionStyle}>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '4px' }}>
+            Receita por Grupo de Procedimento (R$)
+          </h2>
+          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+            Valor faturado por grupo de procedimento no período.
+          </p>
+          <div style={chartContainerStyle}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={porGrupo} margin={{ top: 20, right: 20, left: 0, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="nome" angle={-30} textAnchor="end" interval={0} height={60} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
+                <Legend />
+                <Bar dataKey="valor" fill="#a855f7">
+                  <LabelList dataKey="valorFormatado" position="top" style={{ fontSize: 11, fill: '#4c1d95', fontWeight: 600 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </section>
 
-        <section>
-          <h2>Faturamento por Dia</h2>
-
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={faturamentoPorDia}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-
-              <Bar dataKey="valor" fill="#14b8a6" />
-            </BarChart>
-          </ResponsiveContainer>
+        <section style={chartSectionStyle}>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '4px' }}>
+            Quantidade de Atendimentos por Grupo
+          </h2>
+          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+            Número de atendimentos realizados em cada grupo de procedimento.
+          </p>
+          <div style={chartContainerStyle}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={porGrupo} margin={{ top: 20, right: 20, left: 0, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="nome" angle={-30} textAnchor="end" interval={0} height={60} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="quantidade" fill="#22c55e">
+                  <LabelList dataKey="quantidade" position="top" style={{ fontSize: 11, fill: '#166534', fontWeight: 600 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </section>
 
-        <section>
-          <h2>Top Procedimentos</h2>
+        <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Consulta vs Exame
+  </h2>
 
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={topProcedimentos}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+<BarChart data={consultaExame}>
+        <CartesianGrid strokeDasharray="3 3" />
+<XAxis dataKey="nome" interval={0} />
+        <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#6366f1">   <LabelList     dataKey="valor"     position="top"    formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}  /> </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>
 
-              <Bar dataKey="valor" fill="#ef4444" />
-            </BarChart>
-          </ResponsiveContainer>
-        </section>
+      <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Faturamento por Dia
+  </h2>
 
-        <section>
-          <h2>Ticket Médio por Convênio</h2>
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+<BarChart data={faturamentoPorDia}>
+      
+        <CartesianGrid strokeDasharray="3 3" />
+<XAxis
+  dataKey="nome"
+  interval="preserveStartEnd"
+  tickFormatter={(v:any)=>{
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return v;
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+}}
+  
+/>
+<YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#14b8a6">   <LabelList     dataKey="valor"     position="top"     formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}  /> </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>  
 
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={ticketPorConvenio}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
+        <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Top 10 Procedimentos (Faturamento)
+  </h2>
 
-              <Bar dataKey="valor" fill="#0ea5e9" />
-            </BarChart>
-          </ResponsiveContainer>
-        </section>
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+
+<BarChart data={topProcedimentos}>
+  
+        <CartesianGrid strokeDasharray="3 3" />
+
+<XAxis
+  dataKey="nome"
+  angle={-30}
+  textAnchor="end"
+  interval={0}
+  height={70}
+/>
+        
+        <YAxis tickFormatter={(v)=>`R$ ${(v/1000).toFixed(0)}k`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#ef4444">
+          <LabelList
+            dataKey="valor"
+            position="top"
+         formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}
+          />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>
+
+        <section style={chartSectionStyle}>
+  <h2 style={{ fontSize: '18px', fontWeight: 600 }}>
+    Ticket Médio por Convênio
+  </h2>
+
+  <div style={chartContainerStyle}>
+    <ResponsiveContainer width="100%" height="100%">
+ <BarChart data={ticketPorConvenio}>
+        <CartesianGrid strokeDasharray="3 3" />
+
+<XAxis
+  dataKey="nome"
+  angle={-30}
+  textAnchor="end"
+  interval={0}
+  height={70}
+/>
+        
+        <YAxis tickFormatter={(v)=>`R$ ${Number(v).toLocaleString('pt-BR')}`} />
+        <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
+        <Legend />
+        <Bar dataKey="valor" fill="#0ea5e9">
+          <LabelList
+            dataKey="valor"
+            position="top"
+formatter={(v:any)=>{
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}}
+          />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>
+
+        
+
+        <footer style={{ marginTop: '32px', fontSize: '11px', textAlign: 'center', color: '#6b7280' }}>
+          Dados integrados ao Biodata — ImagemCor • Painel em construção
+        </footer>
       </div>
+    </div>
     </>
   );
 }
