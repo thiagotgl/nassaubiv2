@@ -121,7 +121,8 @@ const pacientes = new Set<string>();
 let total = 0;
 
       const dataInicio = new Date(inicio + "T00:00:00");
-const dataFim = new Date(fim + "T23:59:59");
+const dataFim = new Date(fim);
+dataFim.setHours(23,59,59,999);;
 
 // LOOP ÚNICO
 
@@ -129,18 +130,27 @@ const dataFim = new Date(fim + "T23:59:59");
 
   if (!item.datatende) return;
 
-  const partes = String(item.datatende).split(" ");
-  const dataStr = partes[0] || "";
+const dataTexto = item.datatende;
 
+if (!dataTexto) return;
 
-const partesData = dataStr.split("/");
+// exemplo: "08/01/2026 16:38:44"
+const [dataParte] = dataTexto.split(" ");
 
-if (partesData.length !== 3) return;
+const [dia, mes, ano] = dataParte.split("/").map(Number);
 
-const [dia, mes, ano] = partesData;
+if (!dia || !mes || !ano) return;
 
-        
-  const dataItem = new Date(`${ano}-${mes}-${dia}`);
+const dataItem = new Date(ano, mes - 1, dia);
+
+        if (
+  dataItem < dataInicio ||
+  dataItem > dataFim
+) {
+  return;
+}
+
+        console.log("DATA FILTRADA:", dataItem);
 
 
 // if (
