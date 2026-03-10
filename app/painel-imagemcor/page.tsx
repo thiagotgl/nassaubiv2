@@ -544,7 +544,12 @@ setTicketPorConvenio(ticketConvenioData);
 <XAxis
   dataKey="nome"
   interval="preserveStartEnd"
-  tickFormatter={(v)=>new Date(v).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+  tickFormatter={(v:any)=>{
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return v;
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+}}
+  
 />
 <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
         <Tooltip formatter={(v:any)=>Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/>
