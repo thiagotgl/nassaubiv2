@@ -157,8 +157,12 @@ let total = 0
 
       dadosFiltrados.forEach((item:any) => {
 
-  const valor = parseGenericNumber(item.numvalor);
-  total += valor;
+const valor = parseGenericNumber(item.numvalor);
+const quantidade = Number(item.numquantidade) || 1;
+
+const valorTotalItem = valor * quantidade;
+
+total += valorTotalItem;
 
   // PACIENTES
   if (item.strcliente) {
