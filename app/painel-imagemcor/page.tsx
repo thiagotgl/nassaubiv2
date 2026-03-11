@@ -157,7 +157,7 @@ let total = 0
 
       dadosFiltrados.forEach((item:any) => {
 
-const valor = parseGenericNumber(item.numvalor) / 100;
+const valor = parseGenericNumber(item.numvalor);
 const quantidade = Number(item.numquantidade) || 1;
 
 const valorTotalItem = valor * quantidade;
