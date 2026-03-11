@@ -27,10 +27,16 @@ function parseBRLToNumber(texto: string | null | undefined): number {
 
 function parseGenericNumber(v: any): number {
   if (v == null) return 0;
-  if (typeof v === 'number') return v;
+
   const str = String(v).trim();
+
   if (!str) return 0;
-  const num = Number(str.replace(/[^\d.-]/g, ''));
+
+  // converte formato brasileiro
+  const normalizado = str.replace(".", "").replace(",", ".");
+
+  const num = Number(normalizado);
+
   return Number.isFinite(num) ? num : 0;
 }
 
