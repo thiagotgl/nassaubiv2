@@ -120,9 +120,12 @@ const pacientes = new Set<string>();
 
 let total = 0;
 
-      const dataInicio = new Date(inicio + "T00:00:00");
-const dataFim = new Date(fim);
-dataFim.setHours(23,59,59,999);;
+const [anoI, mesI, diaI] = inicio.split("-").map(Number);
+const dataInicio = new Date(anoI, mesI - 1, diaI);
+
+const [anoF, mesF, diaF] = fim.split("-").map(Number);
+const dataFim = new Date(anoF, mesF - 1, diaF);
+dataFim.setHours(23, 59, 59, 999);
 
 // LOOP ÚNICO
 
@@ -143,6 +146,10 @@ if (!dia || !mes || !ano) return;
 
 const dataItem = new Date(ano, mes - 1, dia);
 
+        console.log("DATA INICIO:", dataInicio);
+console.log("DATA ITEM:", dataItem);
+console.log("DATA FIM:", dataFim);
+        
         if (
   dataItem < dataInicio ||
   dataItem > dataFim
