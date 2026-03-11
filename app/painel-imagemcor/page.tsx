@@ -63,7 +63,7 @@ export default function PainelImagemCorPage() {
   }, [router]);
 
   const hoje = new Date();
-  const hojeISO = hoje.toISOString().slice(0, 10);
+  const hojeISO = format(new Date(), 'yyyy-MM-dd');
 
   const [inicio, setInicio] = useState<string>(hojeISO);
   const [fim, setFim] = useState<string>(hojeISO);
@@ -103,9 +103,21 @@ if (!Array.isArray(json)) {
   return;
 }
       
-const dados = json;
 
-      const dadosFiltrados = dados.filter((item:any) => {
+
+      const dados = json;
+
+// DATA INICIO
+const [anoI, mesI, diaI] = inicio.split("-").map(Number);
+const dataInicio = new Date(anoI, mesI - 1, diaI);
+
+// DATA FIM
+const [anoF, mesF, diaF] = fim.split("-").map(Number);
+const dataFim = new Date(anoF, mesF - 1, diaF);
+dataFim.setHours(23, 59, 59, 999);
+
+// FILTRO POR DATA
+const dadosFiltrados = dados.filter((item:any) => {
 
   if (!item.datatende) return false;
 
@@ -119,68 +131,31 @@ const dados = json;
   return dataItem >= dataInicio && dataItem <= dataFim;
 
 });
+
+console.log("TOTAL REGISTROS API:", dados.length);
+console.log("REGISTROS FILTRADOS:", dadosFiltrados.length);
+
+// MAPAS PARA AGRUPAMENTO
+
+const mapaConvenio: Record<string, number> = {}
+
+const mapaGrupo: Record<string, { valor: number; quantidade: number }> = {}
+
+const mapaTipoEntrada: Record<string, number> = {}
+
+const mapaDia: Record<string, number> = {}
+
+const mapaProcedimento: Record<string, number> = {}
+
+const mapaTicketConvenio: Record<string, { valor: number; pacientes: Set<string> }> = {}
+
+const pacientes = new Set<string>()
+
+let total = 0
       
-      console.log("TOTAL REGISTROS API:", dados.length);
-console.log("PRIMEIRO REGISTRO:", dados[0]);
+// LOOP PRINCIPAL
 
-      
-// AGRUPAR POR CONVÊNIO
-const mapaConvenio: Record<string, number> = {};
-
-const mapaGrupo: Record<string, { valor: number; quantidade: number }> = {};
-const mapaTipoEntrada: Record<string, number> = {};
-const mapaDia: Record<string, number> = {};
-const mapaProcedimento: Record<string, number> = {};
-const mapaTicketConvenio: Record<string, { valor: number; pacientes: Set<string> }> = {};
-const pacientes = new Set<string>();
-
-let total = 0;
-
-const [anoI, mesI, diaI] = inicio.split("-").map(Number);
-const dataInicio = new Date(anoI, mesI - 1, diaI);
-
-const [anoF, mesF, diaF] = fim.split("-").map(Number);
-const dataFim = new Date(anoF, mesF - 1, diaF);
-dataFim.setHours(23, 59, 59, 999);
-
-// LOOP ÚNICO
-
-     dadosFiltrados.forEach((item:any) => {
-        
-
-  if (!item.datatende) return;
-
-const dataTexto = item.datatende;
-
-if (!dataTexto) return;
-
-// exemplo: "08/01/2026 16:38:44"
-const [dataParte] = dataTexto.split(" ");
-
-const [dia, mes, ano] = dataParte.split("/").map(Number);
-
-if (!dia || !mes || !ano) return;
-
-const dataItem = new Date(ano, mes - 1, dia);
-
-        
-        if (
-  dataItem < dataInicio ||
-  dataItem > dataFim
-) {
-  return;
-}
-
-        console.log("DATA FILTRADA:", dataItem);
-
-
-// if (
-//   isNaN(dataItem.getTime()) ||
-//   dataItem < dataInicio ||
-//   dataItem > dataFim
-// ) {
-//   return;
-// }
+      dadosFiltrados.forEach((item:any) => {
 
   const valor = parseGenericNumber(item.numvalor);
   total += valor;
@@ -195,10 +170,11 @@ const dataItem = new Date(ano, mes - 1, dia);
   mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
 
   // PROCEDIMENTO
- const procedimento =
-  item.strdescrprocedimento ||
-  item.strprocedimento ||
-  "Sem procedimento";
+  const procedimento =
+    item.strdescrprocedimento ||
+    item.strprocedimento ||
+    "Sem procedimento";
+
   mapaProcedimento[procedimento] =
     (mapaProcedimento[procedimento] || 0) + valor;
 
@@ -232,11 +208,15 @@ const dataItem = new Date(ano, mes - 1, dia);
   mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
 
   // FATURAMENTO POR DIA
+  const [dataParte] = item.datatende.split(" ");
+  const [dia, mes, ano] = dataParte.split("/").map(Number);
+
+  const dataItem = new Date(ano, mes - 1, dia);
   const dataISO = dataItem.toISOString().slice(0,10);
+
   mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valor;
 
 });
-      
       
       // TOTAL
 setTotalReceita(total);
