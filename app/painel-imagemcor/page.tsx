@@ -104,6 +104,22 @@ if (!Array.isArray(json)) {
 }
       
 const dados = json;
+
+      const dadosFiltrados = dados.filter((item:any) => {
+
+  if (!item.datatende) return false;
+
+  const [dataParte] = item.datatende.split(" ");
+  const [dia, mes, ano] = dataParte.split("/").map(Number);
+
+  if (!dia || !mes || !ano) return false;
+
+  const dataItem = new Date(ano, mes - 1, dia);
+
+  return dataItem >= dataInicio && dataItem <= dataFim;
+
+});
+      
       console.log("TOTAL REGISTROS API:", dados.length);
 console.log("PRIMEIRO REGISTRO:", dados[0]);
 
@@ -129,7 +145,8 @@ dataFim.setHours(23, 59, 59, 999);
 
 // LOOP ÚNICO
 
-      dados.forEach((item: any) => {
+     dadosFiltrados.forEach((item:any) => {
+        
 
   if (!item.datatende) return;
 
@@ -146,9 +163,6 @@ if (!dia || !mes || !ano) return;
 
 const dataItem = new Date(ano, mes - 1, dia);
 
-        console.log("DATA INICIO:", dataInicio);
-console.log("DATA ITEM:", dataItem);
-console.log("DATA FIM:", dataFim);
         
         if (
   dataItem < dataInicio ||
