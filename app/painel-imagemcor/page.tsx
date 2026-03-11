@@ -176,10 +176,10 @@ total += valorTotalItem;
   quantidade,
   valorTotalItem
 );
-  // PACIENTES
-  if (item.strcliente) {
-    pacientes.add(item.strcliente);
-  }
+// PACIENTES NOVOS (primeira visita)
+if (item.strcodigoatendimento?.endsWith("-1")) {
+  pacientes.add(item.strcliente);
+}
 
   // CONVÊNIO
   const convenio = item.strconvenio?.trim() || "Sem convênio";
@@ -216,7 +216,7 @@ mapaTicketConvenio[convenio].valor += valorTotalItem;
     mapaGrupo[grupo] = { valor: 0, quantidade: 0 };
   }
 
-  mapaGrupo[grupo].valor += valor;
+  mapaGrupo[grupo].valor += valorTotalItem;
   mapaGrupo[grupo].quantidade += qtd;
 
   // CONSULTA VS EXAME
