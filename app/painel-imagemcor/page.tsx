@@ -164,6 +164,12 @@ const valorTotalItem = valor * quantidade;
 
 total += valorTotalItem;
 
+        console.log(
+  item.datatende,
+  valor,
+  quantidade,
+  valorTotalItem
+);
   // PACIENTES
   if (item.strcliente) {
     pacientes.add(item.strcliente);
@@ -171,7 +177,7 @@ total += valorTotalItem;
 
   // CONVÊNIO
   const convenio = item.strconvenio?.trim() || "Sem convênio";
-  mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valor;
+mapaConvenio[convenio] = (mapaConvenio[convenio] || 0) + valorTotalItem;
 
   // PROCEDIMENTO
   const procedimento =
@@ -179,8 +185,8 @@ total += valorTotalItem;
     item.strprocedimento ||
     "Sem procedimento";
 
-  mapaProcedimento[procedimento] =
-    (mapaProcedimento[procedimento] || 0) + valor;
+mapaProcedimento[procedimento] =
+  (mapaProcedimento[procedimento] || 0) + valorTotalItem;
 
   // TICKET MÉDIO CONVÊNIO
   if (!mapaTicketConvenio[convenio]) {
@@ -190,8 +196,8 @@ total += valorTotalItem;
     };
   }
 
-  mapaTicketConvenio[convenio].valor += valor;
-
+mapaTicketConvenio[convenio].valor += valorTotalItem;
+        
   if (item.strcliente) {
     mapaTicketConvenio[convenio].pacientes.add(item.strcliente);
   }
