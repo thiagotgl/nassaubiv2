@@ -156,6 +156,7 @@ const mapaProcedimento: Record<string, number> = {}
 const mapaTicketConvenio: Record<string, { valor: number; pacientes: Set<string> }> = {}
 
 const pacientes = new Set<string>()
+     const atendimentos = new Set<string>() 
 
 let total = 0
       
@@ -170,6 +171,9 @@ const valorTotalItem = valor * quantidade;
 
 total += valorTotalItem;
 
+// REGISTRA ATENDIMENTO (evita duplicação)
+atendimentos.add(item.strcodigoatendimento)
+        
         console.log(
   item.datatende,
   valor,
@@ -221,7 +225,7 @@ mapaTicketConvenio[convenio].valor += valorTotalItem;
 
   // CONSULTA VS EXAME
   const tipo = item.strtipoentrada || "Outros";
-  mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valor;
+  mapaTipoEntrada[tipo] = (mapaTipoEntrada[tipo] || 0) + valorTotalItem;
 
   // FATURAMENTO POR DIA
   const [dataParte] = item.datatende.split(" ");
@@ -230,7 +234,7 @@ mapaTicketConvenio[convenio].valor += valorTotalItem;
   const dataItem = new Date(ano, mes - 1, dia);
   const dataISO = dataItem.toISOString().slice(0,10);
 
-  mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valor;
+  mapaDia[dataISO] = (mapaDia[dataISO] || 0) + valorTotalItem;
 
 });
       
@@ -238,7 +242,7 @@ mapaTicketConvenio[convenio].valor += valorTotalItem;
 setTotalReceita(total);
 
 // TICKET MÉDIO
-const ticket = pacientes.size > 0 ? total / pacientes.size : 0;
+const ticket = atendimentos.size > 0 ? total / atendimentos.size : 0;
 setTicketMedio(ticket);
 
 // PACIENTES
