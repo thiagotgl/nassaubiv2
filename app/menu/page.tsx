@@ -95,6 +95,35 @@ export default function MenuEscolhaModulo() {
               Painel Financeiro ImagemCor
             </button>
           </Link>
+
+          {/* DESCONTOS – Verde Esmeralda */}
+          <Link href="/painel-descontos">
+            <button
+              style={{
+                width: '100%',
+                padding: '28px',
+                fontSize: 24,
+                fontWeight: 800,
+                color: 'white',
+                background: 'linear-gradient(135deg, #059669, #34d399)',
+                border: 'none',
+                borderRadius: 20,
+                cursor: 'pointer',
+                boxShadow: '0 20px 40px rgba(5,150,105,0.25)',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px)';
+                e.currentTarget.style.boxShadow = '0 32px 60px rgba(5,150,105,0.35)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(5,150,105,0.25)';
+              }}
+            >
+              Painel de Descontos
+            </button>
+          </Link>
         </div>
 
         {/* Sair */}
