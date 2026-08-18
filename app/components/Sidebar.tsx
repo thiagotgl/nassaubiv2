@@ -22,6 +22,12 @@ export default function Sidebar() {
       icon: '📊',
       description: 'Painel Financeiro',
     },
+    {
+      name: 'Painel de Descontos',
+      href: '/painel-descontos',
+      icon: '📉',
+      description: 'Descontos por período',
+    },
   ];
 
   const isActive = (href: string) => pathname === href;
