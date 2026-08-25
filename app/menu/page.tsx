@@ -39,7 +39,7 @@ export default function MenuEscolhaModulo() {
         {/* Botões grandes e limpos */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
           {/* NASSAU – Azul Holanda */}
-          <Link href="/dashboard">
+          <Link href="/dashboard?aba=operacional">
             <button
               style={{
                 width: '100%',
@@ -68,7 +68,7 @@ export default function MenuEscolhaModulo() {
           </Link>
 
           {/* BIV – Laranja Real */}
-          <Link href="/painel-imagemcor">
+          <Link href="/dashboard?aba=financeiro">
             <button
               style={{
                 width: '100%',
@@ -97,7 +97,7 @@ export default function MenuEscolhaModulo() {
           </Link>
 
           {/* DESCONTOS – Verde Esmeralda */}
-          <Link href="/painel-descontos">
+          <Link href="/dashboard?aba=descontos">
             <button
               style={{
                 width: '100%',

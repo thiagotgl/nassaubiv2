@@ -25,13 +25,13 @@ export default function LoginPage() {
       } catch (err) {}
     } catch {}
 
-    // redireciona para a origem (se houver) ou para /menu
+    // redireciona para a origem (se houver) ou para /dashboard
     try {
       const params = new URLSearchParams(window.location.search);
-      const from = params.get('from') || '/menu';
+      const from = params.get('from') || '/dashboard';
       router.push(from);
     } catch {
-      router.push('/menu');
+      router.push('/dashboard');
     }
   }
 

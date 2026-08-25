@@ -21,10 +21,10 @@ export function middleware(req: NextRequest) {
   // 2. Verifica se está logado (você usa cookie 'auth' = 'true')
   const isLoggedIn = req.cookies.get('auth')?.value === 'true';
 
-  // 3. Se já está logado e está tentando ir pro /login → joga pro menu
+  // 3. Se já está logado e está tentando ir pro /login → joga pro dashboard
   if (isLoggedIn && pathname === '/login') {
-    const menuUrl = new URL('/menu', req.url);   // muda pra /dashboard se preferir
-    return NextResponse.redirect(menuUrl);
+    const dashboardUrl = new URL('/dashboard', req.url);
+    return NextResponse.redirect(dashboardUrl);
   }
 
   // 4. Se NÃO está logado → manda pro login (com ?from= pra voltar depois)
