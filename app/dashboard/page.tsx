@@ -1,239 +1,126 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '../components/Sidebar';
-import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  LabelList,
-} from 'recharts';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { useRouter } from 'next/navigation';
+import FiltroGlobal from '../components/FiltroGlobal';
+import PainelDescontos from '../components/panels/PainelDescontos';
+import PainelFinanceiro from '../components/panels/PainelFinanceiro';
+import PainelFaturamento from '../components/panels/PainelFaturamento';
+import { cores } from '../components/ui/tema';
 
-// Converte "R$ 29.487,86" em número 29487.86
-function parseBRLToNumber(texto: string | null | undefined): number {
-  if (!texto) return 0;
-  const limpo = texto.replace(/[^\d,.-]/g, '');
-  const normalizado = limpo.replace(/\./g, '').replace(',', '.');
-  const n = Number(normalizado);
-  return Number.isFinite(n) ? n : 0;
+const IDS_ABAS = ['descontos', 'financeiro', 'operacional'];
+
+interface Periodo {
+  inicio: string;
+  fim: string;
 }
 
-export default function Dashboard() {
+function periodoPadrao(): Periodo {
+  const agora = new Date();
+  const primeiroDia = new Date(agora.getFullYear(), agora.getMonth(), 1)
+    .toISOString()
+    .slice(0, 10);
+  return { inicio: primeiroDia, fim: agora.toISOString().slice(0, 10) };
+}
+
+function DashboardShell() {
+  const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Verificação de login
+  const abaParam = searchParams.get('aba');
+  const abaAtual = IDS_ABAS.includes(abaParam ?? '') ? abaParam! : 'descontos';
+
+  // Filtro global: Descontos e Financeiro usam o período de datas; Operacional
+  // usa apenas o ano. consultaId e anoConsultaId são separados para aplicar o
+  // ano não disparar refetch desnecessário nas abas de data.
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
+  const [consultaId, setConsultaId] = useState(0);
+  const [ano, setAno] = useState(new Date().getFullYear());
+  const [anoConsultaId, setAnoConsultaId] = useState(0);
+
+  const aplicarPeriodo = (novo: Periodo) => {
+    setPeriodo(novo);
+    setConsultaId((c) => c + 1);
+  };
+
+  const aplicarAno = (novoAno: number) => {
+    setAno(novoAno);
+    setAnoConsultaId((c) => c + 1);
+  };
+
+  // Cada painel só é montado na primeira visita e permanece montado (oculto),
+  // preservando dados e filtros ao alternar de aba.
+  const [visitadas, setVisitadas] = useState<Record<string, boolean>>({
+    [abaAtual]: true,
+  });
+
   useEffect(() => {
-    try {
-      const logado = window.localStorage.getItem('logado');
-      if (!logado) {
-        router.replace('/login');
-      }
-    } catch {
-      router.replace('/login');
-    }
-  }, [router]);
+    setVisitadas((prev) => (prev[abaAtual] ? prev : { ...prev, [abaAtual]: true }));
+  }, [abaAtual]);
 
-  // ←←← NOVO: seletor de ano (de 2020 até o ano atual + 2)
-  const anoAtual = new Date().getFullYear();
-  const [anoSelecionado, setAnoSelecionado] = useState(anoAtual);
+  const trocarAba = (id: string) => {
+    router.replace(`/dashboard?aba=${id}`, { scroll: false });
+  };
 
-  const [hoje, setHoje] = useState<any>(null);
-  const [mensal, setMensal] = useState<any[]>([]);
-  const [mensalDespesas, setMensalDespesas] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
+  // Pré-aquecimento: pouco depois do primeiro paint da aba inicial, aquece o
+  // cache server-side das duas rotas em lote (período vigente e ano vigente).
+  // Assim, ao abrir qualquer aba pela primeira vez a resposta já vem pronta do
+  // cache (sem montar painéis ocultos, o que quebraria os gráficos Recharts
+  // renderizados dentro de display:none).
   useEffect(() => {
-    const carregarTudo = async () => {
-      setLoading(true);
-
-      // Faturamento de hoje
-      const hojeStr = new Date().toISOString().slice(0, 10);
-      const hojeRes = await fetch(`/api/faturamento?inicio=${hojeStr}&fim=${hojeStr}`);
-      const hojeData = await hojeRes.json();
-      setHoje(hojeData);
-
-      // 12 meses do ano selecionado
-      const meses: { inicio: string; fim: string; nome: string }[] = [];
-      for (let i = 0; i < 12; i++) {
-        const data = new Date(anoSelecionado, i, 1);
-        const inicio = data.toISOString().slice(0, 10);
-        const fimMes = new Date(anoSelecionado, i + 1, 0);
-        const fim = fimMes.toISOString().slice(0, 10);
-        const nomeMes = data.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
-        meses.push({ inicio, fim, nome: `${nomeMes} ${anoSelecionado}` });
-      }
-
-      const mensalData = await Promise.all(
-        meses.map(async ({ inicio, fim, nome }) => {
-          const res = await fetch(`/api/faturamento?inicio=${inicio}&fim=${fim}`);
-          const data = await res.json();
-          const valor = data.valor_bruto || 0;
-          return {
-            mes: nome,
-            valor,
-            valorFormatado: valor.toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL',
-            }),
-          };
-        })
-      );
-
-      const mensalDespesasData = await Promise.all(
-        meses.map(async ({ inicio, fim, nome }) => {
-          const url =
-            'https://apis.biodataweb.net/ImagemCor544/biodata/dashboard/grafico' +
-            '?target_url=null' +
-            '&procedure=spBITotalDespesas' +
-            '&parametros=%40DATAINICIO,%40DATAFIM,%40UNIDADE' +
-            `&valores=${inicio},${fim},_,` +
-            '&idSAC=544';
-          const res = await fetch(url);
-          const json = await res.json();
-          const texto = json?.[0]?.['R$'] ?? 'R$ 0,00';
-          const valor = parseBRLToNumber(texto);
-          return {
-            mes: nome,
-            valor,
-            valorFormatado: texto,
-          };
-        })
-      );
-
-      setHoje(hojeData);
-      setMensal(mensalData);
-      setMensalDespesas(mensalDespesasData);
-      setLoading(false);
-    };
-
-    carregarTudo();
-  }, [anoSelecionado]); // ←←← recarrega quando muda o ano
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <p className="text-6xl font-bold text-white animate-pulse">
-          Carregando PowerNassau BI...
-        </p>
-      </div>
-    );
-  }
+    const t = setTimeout(() => {
+      fetch(
+        `/api/faturamento/periodo?inicio=${periodo.inicio}&fim=${periodo.fim}`
+      ).catch(() => {});
+      fetch(`/api/faturamento/ano?ano=${ano}`).catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodo.inicio, periodo.fim, ano]);
 
   return (
     <>
-      <Sidebar />
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-        <div style={{ maxWidth: '1120px', margin: '0 auto', padding: '32px 16px 40px' }} className="space-y-32">
+      <Sidebar abaAtiva={abaAtual} onTrocarAba={trocarAba} />
+      {/* Fundo único do dashboard: cobre filtro e conteúdo sem emendas. */}
+      <div
+        className="with-sidebar"
+        style={{ minHeight: '100vh', backgroundColor: cores.fundo }}
+      >
+        <FiltroGlobal
+          abaAtiva={abaAtual}
+          periodoInicial={periodo}
+          onAplicarPeriodo={aplicarPeriodo}
+          anoInicial={ano}
+          onAplicarAno={aplicarAno}
+        />
 
-          <h1 className="text-7xl md:text-9xl font-black text-center bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-yellow-400 to-pink-500 drop-shadow-2xl">
-            FATURAMENTO TOTAL CLÍNICA
-          </h1>
-
-          {/* SELECT DE ANO – BONITO, SEGURO E FUNCIONAL */}
-          <div className="flex justify-center -mt-16 mb-10">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl px-8 py-6 border border-white/20 shadow-2xl">
-              <label className="text-2xl font-bold text-white mr-6">Ano:</label>
-              <select
-                value={anoSelecionado}
-                onChange={(e) => setAnoSelecionado(Number(e.target.value))}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-3xl font-bold px-8 py-4 rounded-xl cursor-pointer focus:outline-none focus:ring-4 focus:ring-purple-400"
-              >
-                {Array.from({ length: 8 }, (_, i) => anoAtual - 4 + i).map(ano => (
-                  <option key={ano} value={ano} className="bg-gray-900 text-xl">
-                    {ano}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {visitadas.descontos && (
+          <div style={{ display: abaAtual === 'descontos' ? 'block' : 'none' }}>
+            <PainelDescontos periodo={periodo} consultaId={consultaId} />
           </div>
+        )}
 
-          {/* CARD DO DIA */}
-          <section className="text-center">
-            <div className="inline-block bg-white/10 backdrop-blur-3xl rounded-3xl p-20 shadow-2xl border border-white/30">
-              <p className="text-5xl font-bold mb-8">Faturamento Hoje</p>
-              <p className="text-9xl font-black text-green-400">
-                {hoje.faturamento}
-              </p>
-              <p className="text-3xl mt-10 opacity-80">
-                {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-              </p>
-            </div>
-          </section>
+        {visitadas.financeiro && (
+          <div style={{ display: abaAtual === 'financeiro' ? 'block' : 'none' }}>
+            <PainelFinanceiro periodo={periodo} consultaId={consultaId} />
+          </div>
+        )}
 
-          {/* GRÁFICO FATURAMENTO */}
-          <section>
-            <div className="text-center">
-              <h2 className="text-5xl font-bold mb-4">
-                Evolução Mensal — {anoSelecionado}
-              </h2>
-              <p className="text-lg md:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed opacity-90">
-                Os valores exibidos referem-se ao faturamento efetivamente registrado. <strong>PDVs particulares</strong> aparecem somente após a efetivação e <strong>convênios</strong> após o recebimento do crédito.
-              </p>
-            </div>
-
-            <div className="mt-12 bg-slate-50 rounded-3xl p-12 shadow-2xl">
-              <ResponsiveContainer width="100%" height={500}>
-                <ComposedChart data={mensal} margin={{ top: 60, right: 40, left: 20, bottom: 40 }}>
-                  <CartesianGrid stroke="#e5e7eb" strokeOpacity={0.4} vertical={false} />
-                  <XAxis dataKey="mes" stroke="#6b7280" fontSize={14} tickMargin={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
-                  <Bar dataKey="valor" barSize={45} radius={[6, 6, 0, 0]} fill="#1e3a8a">
-                    <LabelList dataKey="valorFormatado" position="top" offset={18} style={{ fill: '#1e3a8a', fontSize: 15, fontWeight: 700 }} />
-                  </Bar>
-                  <Line
-                    type="monotone"
-                    dataKey="valor"
-                    stroke="#60a5fa"
-                    strokeWidth={4}
-                    strokeDasharray="8 8"
-                    dot={{ r: 7, fill: '#1e3a8a', strokeWidth: 3, stroke: '#60a5fa' }}
-                    activeDot={{ r: 9 }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-
-          {/* GRÁFICO DESPESAS */}
-          <section>
-            <h2 className="text-5xl font-bold text-center mb-16">
-              Despesas Mensais — {anoSelecionado}
-            </h2>
-            <div className="bg-orange-50 rounded-3xl p-12 shadow-2xl">
-              <ResponsiveContainer width="100%" height={500}>
-                <ComposedChart data={mensalDespesas} margin={{ top: 60, right: 40, left: 20, bottom: 40 }}>
-                  <CartesianGrid stroke="#fed7aa" strokeOpacity={0.5} vertical={false} />
-                  <XAxis dataKey="mes" stroke="#9a3412" fontSize={14} tickMargin={12} />
-                  <YAxis stroke="#9a3412" fontSize={12} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
-                  <Bar dataKey="valor" barSize={45} radius={[6, 6, 0, 0]} fill="#ea580c">
-                    <LabelList dataKey="valorFormatado" position="top" offset={18} style={{ fill: '#9a3412', fontSize: 15, fontWeight: 700 }} />
-                  </Bar>
-                  <Line
-                    type="monotone"
-                    dataKey="valor"
-                    stroke="#fb923c"
-                    strokeWidth={4}
-                    strokeDasharray="10 8"
-                    dot={{ r: 7, fill: '#ea580c', strokeWidth: 3, stroke: '#fb923c' }}
-                    activeDot={{ r: 9 }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-
-          <footer className="text-center pb-20 text-xl opacity-70">
-            Dados 100% reais do Biodata — atualizado automaticamente
-          </footer>
-        </div>
+        {visitadas.operacional && (
+          <div style={{ display: abaAtual === 'operacional' ? 'block' : 'none' }}>
+            <PainelFaturamento ano={ano} anoConsultaId={anoConsultaId} />
+          </div>
+        )}
       </div>
     </>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardShell />
+    </Suspense>
   );
 }
