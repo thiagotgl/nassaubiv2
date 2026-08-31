@@ -28,6 +28,19 @@ function DashboardShell() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  // O middleware é a proteção principal. Esta checagem cobre uma navegação
+  // client-side que possa reutilizar o cache do dashboard após logout.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem('logado') === 'true') return;
+    } catch {
+      // Sem acesso ao storage, trate a sessão client-side como inválida.
+    }
+
+    const origem = `${window.location.pathname}${window.location.search}`;
+    window.location.replace(`/login?from=${encodeURIComponent(origem)}`);
+  }, []);
+
   const abaParam = searchParams.get('aba');
   const abaAtual = IDS_ABAS.includes(abaParam ?? '') ? abaParam! : 'descontos';
 

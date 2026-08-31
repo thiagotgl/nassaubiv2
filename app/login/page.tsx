@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
 
@@ -25,13 +23,16 @@ export default function LoginPage() {
       } catch (err) {}
     } catch {}
 
-    // redireciona para a origem (se houver) ou para /dashboard
+    // Navegação completa garante que o cookie recém-criado seja validado pelo
+    // middleware antes de abrir o dashboard.
     try {
       const params = new URLSearchParams(window.location.search);
-      const from = params.get('from') || '/dashboard';
-      router.push(from);
+      const from = params.get('from');
+      const destino =
+        from?.startsWith('/') && !from.startsWith('//') ? from : '/dashboard';
+      window.location.assign(destino);
     } catch {
-      router.push('/dashboard');
+      window.location.assign('/dashboard');
     }
   }
 

@@ -3,14 +3,23 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const isLoggedIn = req.cookies.get('auth')?.value === 'true';
 
-  // 1. Libera rotas públicas e internas (você já tinha, só organizei melhor)
+  // /login precisa passar pelo middleware: quem já está autenticado não deve
+  // voltar para a tela de login.
+  if (pathname === '/login') {
+    if (isLoggedIn) {
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Libera somente recursos internos e APIs.
   const publicPaths = [
     '/_next',
     '/api',
     '/static',
     '/favicon.ico',
-    '/login',                    // permite acessar a página de login
   ];
 
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
@@ -18,16 +27,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Verifica se está logado (você usa cookie 'auth' = 'true')
-  const isLoggedIn = req.cookies.get('auth')?.value === 'true';
-
-  // 3. Se já está logado e está tentando ir pro /login → joga pro dashboard
-  if (isLoggedIn && pathname === '/login') {
-    const dashboardUrl = new URL('/dashboard', req.url);
-    return NextResponse.redirect(dashboardUrl);
-  }
-
-  // 4. Se NÃO está logado → manda pro login (com ?from= pra voltar depois)
+  // Se NÃO está logado → manda pro login (com ?from= pra voltar depois).
   if (!isLoggedIn) {
     const loginUrl = req.nextUrl.clone();
     loginUrl.pathname = '/login';
@@ -35,11 +35,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 5. Qualquer outro caso (logado e acessando rota protegida) → deixa passar
+  // Usuário logado acessando rota protegida.
   return NextResponse.next();
 }
 
-// Aplicar em todas as rotas exceto as públicas
+// /login fica no matcher para redirecionar usuários já autenticados.
 export const config = {
-  matcher: ['/((?!_next|api|static|favicon.ico|login).*)'],
+  matcher: ['/((?!_next|api|static|favicon.ico).*)'],
 };
