@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import Card from '../components/ui/Card';
+import { cores } from '../components/ui/tema';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
 
@@ -25,13 +25,16 @@ export default function LoginPage() {
       } catch (err) {}
     } catch {}
 
-    // redireciona para a origem (se houver) ou para /dashboard
+    // Navegação completa garante que o cookie recém-criado seja validado pelo
+    // middleware antes de abrir o dashboard.
     try {
       const params = new URLSearchParams(window.location.search);
-      const from = params.get('from') || '/dashboard';
-      router.push(from);
+      const from = params.get('from');
+      const destino =
+        from?.startsWith('/') && !from.startsWith('//') ? from : '/dashboard';
+      window.location.assign(destino);
     } catch {
-      router.push('/dashboard');
+      window.location.assign('/dashboard');
     }
   }
 
@@ -39,94 +42,126 @@ export default function LoginPage() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#ffffff',
+        backgroundColor: cores.fundo,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px',
-        fontFamily: '-apple-system,BlinkMacSystemFont,system-ui,sans-serif',
+        padding: '16px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 480, textAlign: 'center' }}>
-        {/* Título */}
-        <h1
-          style={{
-            fontSize: 42,
-            fontWeight: 900,
-            color: '#003087', // azul Holanda
-            marginBottom: 12,
-          }}
-        >
-          PowerNassau BI
-        </h1>
-        <p style={{ fontSize: 20, color: '#475569', marginBottom: 64 }}>
-          Bem-vindo! Informe a senha para continuar.
-        </p>
+      <div style={{ width: '100%', maxWidth: '420px' }}>
+        <Card estilo={{ marginTop: 0, padding: '32px' }}>
+          <header style={{ marginBottom: '24px' }}>
+            <p
+              style={{
+                marginBottom: '8px',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: cores.suave,
+              }}
+            >
+              Acesso ao dashboard
+            </p>
+            <h1
+              style={{
+                marginBottom: '8px',
+                fontSize: '28px',
+                fontWeight: 900,
+                color: cores.primaria,
+              }}
+            >
+              PowerNassau BI
+            </h1>
+            <p style={{ fontSize: '14px', color: cores.corpo }}>
+              Informe a senha para continuar.
+            </p>
+          </header>
 
-        {/* Campo de senha */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <div>
-            <input
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="Digite sua senha"
-              required
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label htmlFor="senha" style={{ fontSize: '13px', fontWeight: 600, color: cores.corpo }}>
+                Senha
+              </label>
+              <input
+                id="senha"
+                type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Digite sua senha"
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  fontSize: '16px',
+                  borderRadius: '8px',
+                  border: `1px solid ${cores.borda}`,
+                  backgroundColor: cores.card,
+                  color: cores.titulo,
+                  outline: 'none',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = cores.primaria;
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 48, 135, 0.12)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = cores.borda;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+
+            {erro && (
+              <p
+                style={{
+                  padding: '10px 12px',
+                  border: `1px solid #fecaca`,
+                  borderRadius: '8px',
+                  backgroundColor: '#fef2f2',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: cores.erro,
+                }}
+              >
+                {erro}
+              </p>
+            )}
+
+            <button
+              type="submit"
               style={{
                 width: '100%',
-                padding: '20px 24px',
-                fontSize: 18,
-                borderRadius: 16,
-                border: '2px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                outline: 'none',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
-                transition: 'all 0.3s',
+                padding: '12px 16px',
+                fontSize: '16px',
+                fontWeight: 700,
+                color: '#ffffff',
+                backgroundColor: cores.acao,
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                transition: 'background-color 0.2s, transform 0.2s',
               }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = '#003087')}
-              onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
-            />
-          </div>
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = cores.acaoEscura;
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = cores.acao;
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              Entrar no sistema
+            </button>
+          </form>
 
-          {erro && (
-            <p style={{ fontSize: 16, color: '#dc2626', fontWeight: 500 }}>
-              {erro}
-            </p>
-          )}
-
-          {/* Botão Entrar – Azul Nassau */}
-          <button
-            type="submit"
-            style={{
-              width: '100%',
-              padding: '24px',
-              fontSize: 22,
-              fontWeight: 800,
-              color: 'white',
-              background: 'linear-gradient(135deg, #003087, #0050c8)',
-              border: 'none',
-              borderRadius: 20,
-              cursor: 'pointer',
-              boxShadow: '0 20px 40px rgba(0,48,135,0.25)',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-6px)';
-              e.currentTarget.style.boxShadow = '0 32px 60px rgba(0,48,135,0.35)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,48,135,0.25)';
-            }}
-          >
-            Entrar no sistema
-          </button>
-        </form>
-
-        <p style={{ fontSize: 14, color: '#64748b', marginTop: 48 }}>
-          Em caso de dúvida, fale com o time da Nassau Tecnologia.
-        </p>
+          <p style={{ marginTop: '24px', fontSize: '12px', color: cores.suave }}>
+            Em caso de dúvida, fale com o time da Nassau Tecnologia.
+          </p>
+        </Card>
       </div>
     </div>
   );
